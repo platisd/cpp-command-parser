@@ -1,4 +1,4 @@
 # Dummy test
-add_executable(dummy_test DummyTest.cpp)
-# target_link_libraries(dummy_test dummy)
-configure_test(dummy_test)
+add_executable(command_parser_test CommandParserTest.cpp)
+target_link_libraries(command_parser_test command_parser)
+configure_test(command_parser_test)

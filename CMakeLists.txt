@@ -27,8 +27,11 @@ add_compile_options(
 
 add_subdirectory(external)
 
+add_library(command_parser INTERFACE)
+target_include_directories(command_parser INTERFACE include)
+
 add_executable(cpp_command_parser_sample example_main.cpp)
-target_include_directories(cpp_command_parser_sample PUBLIC include)
+target_link_libraries(cpp_command_parser_sample PUBLIC command_parser)
 
 enable_testing()
 add_subdirectory(test)

@@ -240,12 +240,12 @@ public:
                 ++index;
             });
 
-        if (!commandHasCorrectArguments) {
+        if (!commandFound) {
+            std::cerr << "Unrecognized command: " << commandId << std::endl;
             return;
         }
 
-        if (!commandFound) {
-            std::cerr << "Unrecognized command: " << commandId << std::endl;
+        if (!commandHasCorrectArguments) {
             return;
         }
 
