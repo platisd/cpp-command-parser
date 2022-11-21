@@ -224,17 +224,11 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenHelpCalled_WillPrintUsageAndDescri
     auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
     ASSERT_TRUE(parsedCommand.is(command2));
 
-    // Capture stderr
-    std::stringstream buffer;
-    auto originalBuffer = std::cerr.rdbuf();
-    std::cerr.rdbuf(buffer.rdbuf());
-    parsedCommand.help();
-    std::string stdErrOutput = buffer.str();
-    std::cerr.rdbuf(originalBuffer);
+    auto helpPrompt = parsedCommand.help();
 
-    // Ensure all our rather "unique" strings are in stderr
-    EXPECT_THAT(stdErrOutput, testing::HasSubstr(expectedDescription1));
-    EXPECT_THAT(stdErrOutput, testing::HasSubstr(expectedUsage1));
-    EXPECT_THAT(stdErrOutput, testing::HasSubstr(expectedUsage2));
-    EXPECT_THAT(stdErrOutput, testing::HasSubstr(expectedDescription2));
+    // Ensure all our rather "unique" strings are in the help prompt
+    EXPECT_THAT(helpPrompt, testing::HasSubstr(expectedDescription1));
+    EXPECT_THAT(helpPrompt, testing::HasSubstr(expectedUsage1));
+    EXPECT_THAT(helpPrompt, testing::HasSubstr(expectedUsage2));
+    EXPECT_THAT(helpPrompt, testing::HasSubstr(expectedDescription2));
 }

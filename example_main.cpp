@@ -46,10 +46,10 @@ int main(int argc, char* argv[])
         } else {
             std::cout << "get " << key << std::endl;
         }
-    } else if (parsedCommand.is(help)) {
-        parsedCommand.help();
     } else {
-        parsedCommand.help();
+        auto helpPrompt = parsedCommand.help();
+        std::cerr << "Available commands:" << std::endl;
+        std::cerr << helpPrompt << std::endl;
     }
 
     return 0;

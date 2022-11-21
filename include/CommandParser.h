@@ -218,9 +218,8 @@ public:
      * @warning Users should probably use the helper function `UnparsedCommand::parse`
      */
     ParsedCommandImpl(int argc, char* argv[], const T& commands)
+        : helpPrompt_(createHelpPrompt(commands))
     {
-        createHelpPrompt(commands);
-
         if (argc < 2) {
             std::cerr << "No command passed" << std::endl;
             return;
@@ -332,25 +331,22 @@ public:
 
     /**
      * @brief Get the help prompt
+     * @return The help prompt
      */
-    void help() const
-    {
-        std::cerr << "Available commands:" << std::endl;
-        std::cerr << helpPrompt_.str() << std::endl;
-    }
+    std::string help() const { return helpPrompt_; }
 
 private:
     std::optional<std::size_t> commandIndex_ {};
     using ParsedArgumentsType = decltype(transformUnparsedArgumentsType(T {}));
     ParsedArgumentsType parsedArguments_ {};
     std::string commandId_ {};
-    std::stringstream helpPrompt_ {};
+    std::string helpPrompt_ {};
 
     /**
      * @brief Create the help prompt by finding the longest command id and usage so the description is nicely aligned
      * @param commands
      */
-    void createHelpPrompt(const T& commands)
+    std::string createHelpPrompt(const T& commands) const
     {
         std::size_t longestCommandIdAndUsage { 0 };
         details::visitTuple(commands, [&longestCommandIdAndUsage](auto&& command) {
@@ -361,11 +357,14 @@ private:
             }
         });
 
-        details::visitTuple(commands, [this, longestCommandIdAndUsage](auto&& command) {
-            helpPrompt_ << command.id() << " " << command.usage()
-                        << std::string(longestCommandIdAndUsage - (command.id().size() + command.usage().size()), ' ')
-                        << command.description() << std::endl;
+        std::stringstream helpPrompt {};
+        details::visitTuple(commands, [&helpPrompt, longestCommandIdAndUsage](auto&& command) {
+            helpPrompt << command.id() << " " << command.usage()
+                       << std::string(longestCommandIdAndUsage - (command.id().size() + command.usage().size()), ' ')
+                       << command.description() << std::endl;
         });
+
+        return helpPrompt.str();
     }
 };
 
