@@ -107,7 +107,6 @@ constexpr bool hasNoPrecedingOptional()
     return isPartitioned(r.begin(), r.end(), [](auto v) { return v; });
 }
 
-// all types are string-like
 template <class... Types>
 constexpr bool hasAllowedTypes()
 {
