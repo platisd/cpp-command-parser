@@ -359,7 +359,7 @@ private:
 
         std::stringstream helpPrompt {};
         details::visitTuple(commands, [&helpPrompt, longestCommandIdAndUsage](auto&& command) {
-            helpPrompt << command.id() << " " << command.usage()
+            helpPrompt << " " << command.id() << " " << command.usage()
                        << std::string(longestCommandIdAndUsage - (command.id().size() + command.usage().size()), ' ')
                        << command.description() << std::endl;
         });
