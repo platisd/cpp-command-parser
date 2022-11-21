@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <any>
 #include <cassert>
+#include <iostream>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -55,10 +56,29 @@ constexpr bool isPartitioned(InputIt first, InputIt last, UnaryPredicate p)
     return true;
 }
 
+template <class... Ts>
+struct ArrayWrapper {
+    constexpr ArrayWrapper(Ts... ts)
+        : data { ts... }
+    {
+    }
+
+    using value_type = std::tuple_element_t<0, std::tuple<Ts...>>;
+
+    constexpr const value_type* begin() const { return data; }
+
+    constexpr const value_type* end() const { return data + sizeof...(Ts); }
+
+    value_type data[sizeof...(Ts)];
+};
+
 template <class... Types>
 constexpr bool hasNoPrecedingOptional()
 {
-    constexpr std::array<bool, sizeof...(Types)> r { !isOptional<Types>::value... };
+    // TODO: Remove ArrayWrapper once we can use a newer clang version.
+    //  The current one does not think std::array is a literal type
+    constexpr ArrayWrapper r { !isOptional<Types>::value... };
+    // constexpr std::array<bool, sizeof...(Types)> r { !isOptional<Types>::value... };
     return isPartitioned(r.begin(), r.end(), [](auto v) { return v; });
 }
 
@@ -292,6 +312,7 @@ public:
     typename CommandType::ArgumentsType getArgs(const CommandType& command) const
     {
         assert((is(command)) && "Command not found");
+        static_cast<void>(command); // Avoid unused parameter warning in non-debug builds
         typename CommandType::ArgumentsType argsToReturn {};
         details::visitTuple(parsedArguments_, [&argsToReturn, this, index = 0U](auto&& arg) mutable {
             if (index == commandIndex_.value()) {
