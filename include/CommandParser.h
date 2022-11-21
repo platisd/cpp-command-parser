@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <any>
 #include <cassert>
+#include <iomanip>
 #include <iostream>
 #include <optional>
 #include <sstream>
@@ -148,16 +149,22 @@ public:
     using ArgumentsType = std::tuple<Args...>;
 
     /**
-     * @brief Get an explanation with how to use the command
-     * @return A string with the usage
-     */
-    std::string help() const { return "::Usage::  " + id_ + " " + usage_ + " ::Description:: " + description_; };
-
-    /**
      * @brief Get the command ID
      * @return The command ID
      */
     std::string id() const { return id_; };
+
+    /**
+     * @brief Get the command description
+     * @return The command description
+     */
+    std::string usage() const { return usage_; };
+
+    /**
+     * @brief Get the command usage
+     * @return The command usage
+     */
+    std::string description() const { return description_; };
 
     /**
      * @brief Construct a new command with the specified argument types
@@ -212,9 +219,7 @@ public:
      */
     ParsedCommandImpl(int argc, char* argv[], const T& commands)
     {
-        details::visitTuple(commands, [this](auto&& command) {
-            helpPrompt_ << " " << command.id() << " - " << command.help() << std::endl;
-        });
+        createHelpPrompt(commands);
 
         if (argc < 2) {
             std::cerr << "No command passed" << std::endl;
@@ -241,7 +246,8 @@ public:
                     if (unparsedArgs.size() < expectedMinNumberOfArguments
                         || unparsedArgs.size() > expectedMaxNumberOfArguments) {
                         std::cerr << "Wrong number of arguments for command: " << commandId << std::endl;
-                        std::cerr << command.help() << std::endl;
+                        std::cerr << command.id() << " " << command.usage() << " " << command.description()
+                                  << std::endl;
                         std::cerr << "Expected ";
                         const auto atLeastOrAtMost
                             = unparsedArgs.size() < expectedMinNumberOfArguments ? "at least " : "at most ";
@@ -339,6 +345,28 @@ private:
     ParsedArgumentsType parsedArguments_ {};
     std::string commandId_ {};
     std::stringstream helpPrompt_ {};
+
+    /**
+     * @brief Create the help prompt by finding the longest command id and usage so the description is nicely aligned
+     * @param commands
+     */
+    void createHelpPrompt(const T& commands)
+    {
+        std::size_t longestCommandIdAndUsage { 0 };
+        details::visitTuple(commands, [&longestCommandIdAndUsage](auto&& command) {
+            constexpr std::size_t separatorSize { 1 };
+            const auto commandIdAndUsage = command.id().size() + command.usage().size() + separatorSize;
+            if (commandIdAndUsage > longestCommandIdAndUsage) {
+                longestCommandIdAndUsage = commandIdAndUsage;
+            }
+        });
+
+        details::visitTuple(commands, [this, longestCommandIdAndUsage](auto&& command) {
+            helpPrompt_ << command.id() << " " << command.usage()
+                        << std::string(longestCommandIdAndUsage - (command.id().size() + command.usage().size()), ' ')
+                        << command.description() << std::endl;
+        });
+    }
 };
 
 namespace UnparsedCommand {
