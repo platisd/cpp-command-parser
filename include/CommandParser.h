@@ -39,6 +39,18 @@ template <typename T>
 struct isOptional<std::optional<T>> : std::true_type {
 };
 
+template <typename T, typename Valid = void>
+struct isStringOrVoid : std::false_type {
+};
+
+template <typename T>
+struct isStringOrVoid<
+    T,
+    std::enable_if_t<
+        std::is_same_v<T, std::string> || std::is_same_v<T, std::optional<std::string>> || std::is_same_v<T, void>>>
+    : std::true_type {
+};
+
 // Adapted from cppreference:
 // https://en.cppreference.com/w/cpp/algorithm/is_partitioned
 template <class InputIt, class UnaryPredicate>
@@ -51,6 +63,18 @@ constexpr bool isPartitioned(InputIt first, InputIt last, UnaryPredicate p)
     }
     for (; first != last; ++first) {
         if (p(*first)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// constexpr std::all_of because it's not available in C++17
+template <class InputIt, class UnaryPredicate>
+constexpr bool allOf(InputIt first, InputIt last, UnaryPredicate p)
+{
+    for (; first != last; ++first) {
+        if (!p(*first)) {
             return false;
         }
     }
@@ -83,6 +107,14 @@ constexpr bool hasNoPrecedingOptional()
     return isPartitioned(r.begin(), r.end(), [](auto v) { return v; });
 }
 
+// all types are string-like
+template <class... Types>
+constexpr bool hasAllowedTypes()
+{
+    constexpr ArrayWrapper r { isStringOrVoid<Types>::value... };
+    return allOf(r.begin(), r.end(), [](auto v) { return v; });
+}
+
 template <typename... Args>
 class UnparsedCommandImpl
 {
@@ -91,6 +123,7 @@ public:
         hasNoPrecedingOptional<Args...>(),
         "All optional arguments must be placed in the end of the "
         "argument list");
+    static_assert(hasAllowedTypes<Args...>(), "All arguments must either be std::string or std::optional<std::string>");
 
     /**
      * @brief Default constructor to be used internally, users should use the normal constructor
