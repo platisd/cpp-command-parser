@@ -232,3 +232,218 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenHelpCalled_WillPrintUsageAndDescri
     EXPECT_THAT(helpPrompt, testing::HasSubstr(expectedUsage2));
     EXPECT_THAT(helpPrompt, testing::HasSubstr(expectedDescription2));
 }
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenCommandStartingWithHyphens_WillStillGetParsed)
+{
+    std::string expectedCommand { "--help" };
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s);
+    constexpr int argc = 2;
+    std::array<std::string, argc> arguments { "binary"s, expectedCommand };
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+}
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenUnknownOptionsSuppliedWithCommand_WillParseCommandAndIgnoreOptions)
+{
+    std::string expectedCommand { "dummyCommand" };
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s).withArgs<std::string>();
+    constexpr int argc = 4;
+    std::string firstArgument { "firstArgument" };
+    std::string someOption { "-someOption" };
+    std::array<std::string, argc> arguments { "binary"s, expectedCommand, someOption, firstArgument };
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    auto [parsedArgument] = parsedCommand.getArgs(command);
+    EXPECT_EQ(firstArgument, parsedArgument);
+}
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenUnknownOptions_WillReturnUnknownOptions)
+{
+    std::string expectedCommand { "dummyCommand" };
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s);
+    constexpr int argc = 4;
+    std::string someOption { "s" };
+    std::string someOtherOption { "o" };
+    std::array<std::string, argc> arguments { "binary"s, expectedCommand, "-" + someOption, "--" + someOtherOption };
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    auto unknownOptions = parsedCommand.getUnknownOptions();
+    std::unordered_set expectedUnknownOptions { someOption, someOtherOption };
+    EXPECT_EQ(unknownOptions, expectedUnknownOptions);
+}
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenKnownOptions_WillReturnOptions)
+{
+    std::string expectedCommand { "dummyCommand" };
+    std::string firstExpectedOption { "f" };
+    std::string secondExpectedOption { "secondOption" };
+    std::string thirdExpectedButNotReceivedOption { "someThirdOption" };
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s)
+                       .withArgs<std::string>()
+                       .withOptions({ firstExpectedOption, secondExpectedOption, thirdExpectedButNotReceivedOption });
+    auto otherCommand = UnparsedCommand::create("otherCommand"s, "dummyDescription"s).withOptions({ "secondOption" });
+    constexpr int argc = 5;
+    std::string firstArgument { "firstArgument" };
+    std::array<std::string, argc> arguments { "binary"s,
+                                              expectedCommand,
+                                              "-" + firstExpectedOption,
+                                              "--" + secondExpectedOption,
+                                              firstArgument };
+    auto argv = toArgv(arguments);
+    std::tuple commands { command, otherCommand };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    auto [parsedArgument] = parsedCommand.getArgs(command);
+    EXPECT_EQ(firstArgument, parsedArgument);
+    EXPECT_TRUE(parsedCommand.hasOption(firstExpectedOption));
+    EXPECT_TRUE(parsedCommand.hasOption(secondExpectedOption));
+    EXPECT_FALSE(parsedCommand.hasOption(thirdExpectedButNotReceivedOption));
+    EXPECT_EQ(parsedCommand.getUnknownOptions().size(), 0);
+}
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenCompoundOptions_WillReturnOptions)
+{
+    std::string expectedCommand { "dummyCommand" };
+    std::string firstExpectedOption { "a" };
+    std::string secondExpectedOption { "b" };
+    std::string thirdExpectedOption { "c" };
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s)
+                       .withArgs<std::optional<std::string>>()
+                       .withOptions({ firstExpectedOption, secondExpectedOption, thirdExpectedOption });
+    constexpr int argc = 3;
+    std::array<std::string, argc> arguments { "binary"s,
+                                              expectedCommand,
+                                              "-" + firstExpectedOption + secondExpectedOption + thirdExpectedOption };
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    auto [parsedArgument] = parsedCommand.getArgs(command);
+    EXPECT_FALSE(parsedArgument);
+    EXPECT_TRUE(parsedCommand.hasOption(firstExpectedOption));
+    EXPECT_TRUE(parsedCommand.hasOption(secondExpectedOption));
+    EXPECT_TRUE(parsedCommand.hasOption(thirdExpectedOption));
+    EXPECT_EQ(parsedCommand.getUnknownOptions().size(), 0);
+}
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenCompoundOptionsInRandomOrder_WillReturnOptions)
+{
+    std::string expectedCommand { "dummyCommand" };
+    std::string firstExpectedOption { "a" };
+    std::string secondExpectedOption { "b" };
+    std::string thirdExpectedOption { "c" };
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s)
+                       .withArgs<std::optional<std::string>>()
+                       .withOptions({ firstExpectedOption, secondExpectedOption, thirdExpectedOption });
+    constexpr int argc = 3;
+    std::array<std::string, argc> arguments { "binary"s,
+                                              expectedCommand,
+                                              "-" + secondExpectedOption + firstExpectedOption + thirdExpectedOption };
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    auto [parsedArgument] = parsedCommand.getArgs(command);
+    EXPECT_FALSE(parsedArgument);
+    EXPECT_TRUE(parsedCommand.hasOption(firstExpectedOption));
+    EXPECT_TRUE(parsedCommand.hasOption(secondExpectedOption));
+    EXPECT_TRUE(parsedCommand.hasOption(thirdExpectedOption));
+}
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenCompoundOptionsButOneMissing_WillReturnOptions)
+{
+    std::string expectedCommand { "dummyCommand" };
+    std::string firstExpectedButNotReceived { "a" };
+    std::string secondExpectedOption { "b" };
+    std::string thirdExpectedOption { "c" };
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s)
+                       .withArgs<std::optional<std::string>>()
+                       .withOptions({ firstExpectedButNotReceived, secondExpectedOption, thirdExpectedOption });
+    constexpr int argc = 3;
+    std::array<std::string, argc> arguments { "binary"s,
+                                              expectedCommand,
+                                              "-" + thirdExpectedOption + secondExpectedOption };
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    auto [parsedArgument] = parsedCommand.getArgs(command);
+    EXPECT_FALSE(parsedArgument);
+    EXPECT_FALSE(parsedCommand.hasOption(firstExpectedButNotReceived));
+    EXPECT_TRUE(parsedCommand.hasOption(secondExpectedOption));
+    EXPECT_TRUE(parsedCommand.hasOption(thirdExpectedOption));
+}
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenCompoundOptionsWithUnknownElement_WillReturnOptionAsUnknown)
+{
+    std::string expectedCommand { "dummyCommand" };
+    std::string firstExpectedOption { "a" };
+    std::string secondExpectedOption { "b" };
+    std::string thirdExpectedOption { "c" };
+    std::string unknownOption { "d" };
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s)
+                       .withArgs<std::optional<std::string>>()
+                       .withOptions({ firstExpectedOption, secondExpectedOption, thirdExpectedOption });
+    constexpr int argc = 3;
+    std::string compoundOptionWithUknownElement = thirdExpectedOption + secondExpectedOption + unknownOption;
+    std::array<std::string, argc> arguments { "binary"s, expectedCommand, "-" + compoundOptionWithUknownElement };
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    auto [parsedArgument] = parsedCommand.getArgs(command);
+    EXPECT_FALSE(parsedArgument);
+    EXPECT_FALSE(parsedCommand.hasOption(firstExpectedOption));
+    EXPECT_FALSE(parsedCommand.hasOption(secondExpectedOption));
+    EXPECT_FALSE(parsedCommand.hasOption(thirdExpectedOption));
+    EXPECT_EQ(parsedCommand.getUnknownOptions(), std::unordered_set { compoundOptionWithUknownElement });
+}
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenOptionsBetweenArguments_WillParseAllCorrectly)
+{
+    std::string expectedCommand { "dummyCommand" };
+    std::string firstExpectedOption { "a" };
+    std::string secondExpectedOption { "b" };
+    std::string thirdExpectedOption { "c" };
+    std::string firstExpectedArgument { "firstArgument" };
+    std::string secondExpectedArgument { "secondArgument" };
+    std::string thirdExpectedArgument { "thirdArgument" };
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s)
+                       .withArgs<std::string, std::string, std::optional<std::string>>()
+                       .withOptions({ firstExpectedOption, secondExpectedOption, thirdExpectedOption });
+    constexpr int argc = 8;
+    std::array<std::string, argc> arguments { "binary"s,
+                                              expectedCommand,
+                                              "-" + firstExpectedOption,
+                                              firstExpectedArgument,
+                                              "--" + secondExpectedOption,
+                                              secondExpectedArgument,
+                                              thirdExpectedArgument,
+                                              "-" + thirdExpectedOption };
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    auto [parsedFirstArgument, parsedSecondArgument, thirdParsedArgument] = parsedCommand.getArgs(command);
+    EXPECT_EQ(parsedFirstArgument, firstExpectedArgument);
+    EXPECT_EQ(parsedSecondArgument, secondExpectedArgument);
+    EXPECT_EQ(thirdParsedArgument, thirdExpectedArgument);
+    EXPECT_TRUE(parsedCommand.hasOption(firstExpectedOption));
+    EXPECT_TRUE(parsedCommand.hasOption(secondExpectedOption));
+    EXPECT_TRUE(parsedCommand.hasOption(thirdExpectedOption));
+}

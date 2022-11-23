@@ -10,6 +10,7 @@
 #include <string>
 #include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -137,11 +138,21 @@ public:
      * @param usage How to use the command (e.g. "help [command]")
      * @warning Users should probably use the helper function `UnparsedCommand::create`
      */
-    UnparsedCommandImpl(std::string id, std::string description, std::string usage)
+    UnparsedCommandImpl(
+        std::string id,
+        std::string description,
+        std::string usage,
+        std::unordered_set<std::string> options)
         : id_ { std::move(id) }
         , description_ { std::move(description) }
         , usage_ { std::move(usage) }
+        , options_ { std::move(options) }
     {
+        for (const auto& option : options_) {
+            if (option.size() == 1) {
+                shortOptions_.emplace(option);
+            }
+        }
     }
 
     /**
@@ -199,6 +210,20 @@ public:
     std::string description() const { return description_; };
 
     /**
+     * @brief Get all the command options
+     * @return The command options
+     * @warning This function is to be used mostly internally
+     */
+    std::unordered_set<std::string> options() const { return options_; };
+
+    /**
+     * @brief Get the command short options
+     * @return The command short options
+     * @warning This function is to be used mostly internally
+     */
+    std::unordered_set<std::string> shortOptions() const { return shortOptions_; };
+
+    /**
      * @brief Construct a new command with the specified argument types
      * @tparam T The argument types
      * @return A new command with the specified argument types
@@ -206,13 +231,24 @@ public:
     template <typename... T>
     UnparsedCommandImpl<T...> withArgs() const
     {
-        return UnparsedCommandImpl<T...> { id_, description_, usage_ };
+        return UnparsedCommandImpl<T...> { id_, description_, usage_, options_ };
+    }
+
+    /**
+     * @brief Construct a new command with the specified options
+     * @return The command options
+     */
+    UnparsedCommandImpl<Args...> withOptions(const std::unordered_set<std::string>& options) const
+    {
+        return UnparsedCommandImpl<Args...> { id_, description_, usage_, options };
     }
 
 private:
     std::string id_ {};
     std::string description_ {};
     std::string usage_ {};
+    std::unordered_set<std::string> options_ {};
+    std::unordered_set<std::string> shortOptions_ {};
 
     template <typename... T>
     static constexpr bool hasNoArguments()
@@ -258,8 +294,15 @@ public:
         }
         const std::string commandId { argv[1] };
         std::vector<std::string> unparsedArgs {};
+        std::vector<std::string> unparsedOptions {};
         for (int i = 2; i < argc; ++i) {
-            unparsedArgs.emplace_back(argv[i]);
+            if (argv[i][0] == '-') {
+                std::string_view option { argv[i] };
+                option.remove_prefix(std::min(option.find_first_not_of('-'), option.size())); // Remove all leading '-'
+                unparsedOptions.push_back(option.data());
+            } else {
+                unparsedArgs.push_back(argv[i]);
+            }
         }
 
         // Find if the commandId exists in the supplied commands
@@ -267,7 +310,7 @@ public:
         bool commandHasCorrectArguments {};
         details::visitTuple(
             commands,
-            [&commandId, &commandFound, &unparsedArgs, &commandHasCorrectArguments, this, index = 0U](
+            [&commandId, &commandFound, &unparsedArgs, &commandHasCorrectArguments, &unparsedOptions, this, index = 0U](
                 auto&& command) mutable {
                 if (command.id() == commandId) {
                     commandFound = true;
@@ -285,13 +328,35 @@ public:
                         std::cerr << atLeastOrAtMost << expectedMaxNumberOfArguments << " arguments, got "
                                   << unparsedArgs.size() << " instead: ";
                         for (const auto& arg : unparsedArgs) {
-                            std::cerr << arg << " ";
+                            std::cerr << "\"" << arg << "\""
+                                      << " ";
                         }
                         std::cerr << std::endl;
                     } else {
                         commandHasCorrectArguments = true;
                         commandIndex_ = index;
                         commandId_ = commandId;
+                        // Match options
+                        for (const auto& unparsedOption : unparsedOptions) {
+                            // Match stand-alone options
+                            if (auto search = command.options().find(unparsedOption);
+                                search != command.options().end()) {
+                                parsedOptions_.emplace(unparsedOption);
+                            } else { // Match compound options (e.g. -abc instead of -a -b -c)
+                                const auto allCharactersAreShortOptions
+                                    = std::all_of(unparsedOption.begin(), unparsedOption.end(), [&command](auto c) {
+                                          return command.shortOptions().find(std::string { c })
+                                              != command.shortOptions().end();
+                                      });
+                                if (allCharactersAreShortOptions) {
+                                    for (const auto c : unparsedOption) {
+                                        parsedOptions_.emplace(std::string { c });
+                                    }
+                                } else {
+                                    unknownOptions_.emplace(unparsedOption);
+                                }
+                            }
+                        }
                     }
                 }
                 ++index;
@@ -362,6 +427,19 @@ public:
     }
 
     /**
+     * @brief Check if the supplied option was encountered for the parsed command
+     * @param option
+     * @return true if the option was encountered, false otherwise
+     */
+    bool hasOption(const std::string& option) const { return parsedOptions_.find(option) != parsedOptions_.end(); }
+
+    /**
+     * @brief Get any unknown options encountered during parsing
+     * @return A set of unknown options
+     */
+    std::unordered_set<std::string> getUnknownOptions() const { return unknownOptions_; }
+
+    /**
      * @brief Get the help prompt
      * @return The help prompt
      */
@@ -373,6 +451,8 @@ private:
     ParsedArgumentsType parsedArguments_ {};
     std::string commandId_ {};
     std::string helpPrompt_ {};
+    std::unordered_set<std::string> parsedOptions_ {};
+    std::unordered_set<std::string> unknownOptions_ {};
 
     /**
      * @brief Create the help prompt by finding the longest command id and usage so the description is nicely aligned
@@ -411,7 +491,7 @@ namespace UnparsedCommand {
 inline details::UnparsedCommandImpl<void>
 create(const std::string& id, const std::string& description, const std::string& usage = "")
 {
-    return details::UnparsedCommandImpl<void> { id, description, usage };
+    return details::UnparsedCommandImpl<void> { id, description, usage, {} };
 }
 
 /**

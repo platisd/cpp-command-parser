@@ -13,7 +13,8 @@ int main(int argc, char* argv[])
     const auto all = UnparsedCommand::create("all", "Print current config JSON");
     const auto list = UnparsedCommand::create("list", "List all available configuration keys", "[subkey]")
                           .withArgs<std::optional<std::string>>();
-    const auto get = UnparsedCommand::create("get", "Get configuration key", " <key> [-xyz]")
+    const auto get = UnparsedCommand::create("get", "Get configuration key", "[-xyz] <key> [default]")
+                         .withOptions({ "x", "y", "z" })
                          .withArgs<std::string, std::optional<std::string>>();
     const auto clear = UnparsedCommand::create("clear", "Clear configuration key", "<key>").withArgs<std::string>();
     const auto put
@@ -40,11 +41,13 @@ int main(int argc, char* argv[])
             std::cout << "list" << std::endl;
         }
     } else if (parsedCommand.is(get)) {
-        const auto [key, flags] = parsedCommand.getArgs(get);
-        if (flags) {
-            std::cout << "get " << key << " " << flags.value() << std::endl;
-        } else {
-            std::cout << "get " << key << std::endl;
+        const auto [key, defaultValue] = parsedCommand.getArgs(get);
+        const auto x = parsedCommand.hasOption("x");
+        const auto y = parsedCommand.hasOption("y");
+        const auto z = parsedCommand.hasOption("z");
+        std::cout << "get " << key << " " << x << " " << y << " " << z << std::endl;
+        if (defaultValue) {
+            std::cout << "default " << defaultValue.value() << std::endl;
         }
     } else {
         auto helpPrompt = parsedCommand.help();
