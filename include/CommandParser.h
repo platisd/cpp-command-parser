@@ -339,8 +339,9 @@ public:
                         // Match options
                         for (const auto& unparsedOption : unparsedOptions) {
                             // Match stand-alone options
-                            if (auto search = command.options().find(unparsedOption);
-                                search != command.options().end()) {
+                            const auto availableOptions = command.options();
+                            const auto search = availableOptions.find(unparsedOption);
+                            if (search != availableOptions.end()) {
                                 parsedOptions_.emplace(unparsedOption);
                             } else { // Match compound options (e.g. -abc instead of -a -b -c)
                                 const auto allCharactersAreShortOptions
