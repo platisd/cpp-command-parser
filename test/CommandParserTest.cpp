@@ -447,3 +447,20 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenOptionsBetweenArguments_WillParseA
     EXPECT_TRUE(parsedCommand.hasOption(secondExpectedOption));
     EXPECT_TRUE(parsedCommand.hasOption(thirdExpectedOption));
 }
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenOptionPassedForDifferentCommand_WillNotBeParsed)
+{
+    std::string expectedCommand { "dummyCommand" };
+    std::string expectedOption { "a" };
+    auto firstCommand = UnparsedCommand::create(expectedCommand, "dummyDescription"s);
+    auto secondCommand = UnparsedCommand::create("secondCommand"s, "dummyDescription"s).withOptions({ expectedOption });
+    constexpr int argc = 3;
+    std::array<std::string, argc> arguments { "binary"s, expectedCommand, "-" + expectedOption };
+    auto argv = toArgv(arguments);
+    std::tuple commands { firstCommand, secondCommand };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(firstCommand));
+    EXPECT_FALSE(parsedCommand.hasOption(expectedOption));
+    EXPECT_EQ(parsedCommand.getUnknownOptions(), std::unordered_set { expectedOption });
+}
