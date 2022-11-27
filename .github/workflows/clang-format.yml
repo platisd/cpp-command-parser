@@ -1,0 +1,17 @@
+name: clang-format CI
+
+on: [push]
+
+jobs:
+
+  run-clang-format:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Fetch clang-format
+        run: |
+          sudo apt-get install clang-format
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Run clang-format
+        run: |
+          find . \( -name \*.h -o -name \*.cpp \) -exec clang-format --Werror --dry-run {} +
