@@ -125,16 +125,16 @@ constexpr bool anyOf(InputIt first, InputIt last, UnaryPredicate p)
 
 template <class... Ts>
 struct ArrayWrapper {
-    constexpr ArrayWrapper(Ts... ts)
+    explicit constexpr ArrayWrapper(Ts... ts)
         : data { ts... }
     {
     }
 
     using value_type = std::tuple_element_t<0, std::tuple<Ts...>>;
 
-    constexpr const value_type* begin() const { return data; }
+    [[nodiscard]] constexpr const value_type* begin() const { return data; }
 
-    constexpr const value_type* end() const { return data + sizeof...(Ts); }
+    [[nodiscard]] constexpr const value_type* end() const { return data + sizeof...(Ts); }
 
     value_type data[sizeof...(Ts)];
 };
@@ -368,9 +368,9 @@ public:
             if (argv[i][0] == '-') {
                 std::string_view option { argv[i] };
                 option.remove_prefix(std::min(option.find_first_not_of('-'), option.size())); // Remove all leading '-'
-                unparsedOptions.push_back(option.data());
+                unparsedOptions.emplace_back(option.data());
             } else {
-                unparsedArgs.push_back(argv[i]);
+                unparsedArgs.emplace_back(argv[i]);
             }
         }
 
