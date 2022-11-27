@@ -41,14 +41,27 @@ struct isOptional<std::optional<T>> : std::true_type {
 };
 
 template <typename T, typename Valid = void>
-struct isStringOrVoid : std::false_type {
+struct isVoid : std::false_type {
 };
 
 template <typename T>
-struct isStringOrVoid<
-    T,
-    std::enable_if_t<
-        std::is_same_v<T, std::string> || std::is_same_v<T, std::optional<std::string>> || std::is_same_v<T, void>>>
+struct isVoid<T, std::enable_if_t<std::is_same_v<T, void>>> : std::true_type {
+};
+
+template <typename T, typename Valid = void>
+struct isString : std::false_type {
+};
+
+template <typename T>
+struct isString<T, std::enable_if_t<std::is_same_v<T, std::string>>> : std::true_type {
+};
+
+template <typename T, typename Valid = void>
+struct isOptionalString : std::false_type {
+};
+
+template <typename T>
+struct isOptionalString<T, std::enable_if_t<isOptional<T>::value && isString<typename T::value_type>::value>>
     : std::true_type {
 };
 
@@ -111,7 +124,7 @@ constexpr bool hasNoPrecedingOptional()
 template <class... Types>
 constexpr bool hasAllowedTypes()
 {
-    constexpr ArrayWrapper r { isStringOrVoid<Types>::value... };
+    constexpr ArrayWrapper r { isOptionalString<Types>::value || isVoid<Types>::value || isString<Types>::value... };
     return allOf(r.begin(), r.end(), [](auto v) { return v; });
 }
 
@@ -123,7 +136,9 @@ public:
         hasNoPrecedingOptional<Args...>(),
         "All optional arguments must be placed in the end of the "
         "argument list");
-    static_assert(hasAllowedTypes<Args...>(), "All arguments must either be std::string or std::optional<std::string>");
+    static_assert(
+        hasAllowedTypes<Args...>(),
+        "All arguments must either be void, std::string or std::optional<std::string>");
 
     /**
      * @brief Default constructor to be used internally, users should use the normal constructor
