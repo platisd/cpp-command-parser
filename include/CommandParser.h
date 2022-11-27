@@ -124,7 +124,9 @@ constexpr bool anyOf(InputIt first, InputIt last, UnaryPredicate p)
 }
 
 template <class... Ts>
-struct ArrayWrapper {
+class ArrayWrapper
+{
+public:
     explicit constexpr ArrayWrapper(Ts... ts)
         : data { ts... }
     {
@@ -132,10 +134,14 @@ struct ArrayWrapper {
 
     using value_type = std::tuple_element_t<0, std::tuple<Ts...>>;
 
-    [[nodiscard]] constexpr const value_type* begin() const { return data; }
+    [[nodiscard]] constexpr const value_type* begin() const { return static_cast<const value_type*>(data); }
 
-    [[nodiscard]] constexpr const value_type* end() const { return data + sizeof...(Ts); }
+    [[nodiscard]] constexpr const value_type* end() const
+    {
+        return static_cast<const value_type*>(data) + sizeof...(Ts);
+    }
 
+private:
     value_type data[sizeof...(Ts)];
 };
 
@@ -143,7 +149,7 @@ struct ArrayWrapper {
 template <class... Types>
 constexpr bool hasNoPrecedingOptionalArguments()
 {
-    // TODO: Remove ArrayWrapper and replace with constexpr std::array<bool, sizeof...(Types)>
+    // TODO(dimitris): Remove ArrayWrapper and replace with constexpr std::array<bool, sizeof...(Types)>
     //  once we can use a newer clang version, since clang-8 does not think std::array is a literal type
     constexpr ArrayWrapper r { !isOptional<Types>::value && !isVector<Types>::value... };
     return isPartitioned(r.begin(), r.end(), [](auto v) { return v; });
@@ -244,11 +250,11 @@ public:
     {
         if (hasNoArguments<Args...>()) {
             return 0;
-        } else if (containsType<std::vector<std::string>, Args...>()) {
-            return std::numeric_limits<std::size_t>::max();
-        } else {
-            return sizeof...(Args);
         }
+        if (containsType<std::vector<std::string>, Args...>()) {
+            return std::numeric_limits<std::size_t>::max();
+        }
+        return sizeof...(Args);
     }
 
     /**
@@ -341,7 +347,7 @@ constexpr auto transformUnparsedArgumentsType(std::tuple<T...>)
         std::tuple<std::any>,
         typename T::ArgumentsType>...> {};
 }
-}
+} // namespace details
 
 template <typename T>
 class ParsedCommandImpl
@@ -485,7 +491,7 @@ public:
     template <typename CommandType>
     typename CommandType::ArgumentsType getArgs(const CommandType& command) const
     {
-        assert((is(command)) && "Command not found");
+        assert((is(command)) && "Command not found"); // NOLINT (cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         static_cast<void>(command); // Avoid unused parameter warning in non-debug builds
         typename CommandType::ArgumentsType argsToReturn {};
         details::visitTuple(parsedArguments_, [&argsToReturn, this, index = 0U](auto&& arg) mutable {
@@ -552,7 +558,7 @@ private:
     }
 
     template <typename ArgumentType>
-    void parseArgument(ArgumentType& argToSet, const std::vector<std::string>& unparsedArgs, unsigned int& index)
+    void parseArgument(ArgumentType& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)
     {
         argToSet = unparsedArgs[index];
     }
