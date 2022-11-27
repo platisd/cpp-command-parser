@@ -22,7 +22,12 @@ See [example_main.cpp](example_main.cpp) for a simple example of how to use the 
 const auto all = UnparsedCommand::create("all", "Print current configuration");
 const auto get = UnparsedCommand::create("get", "Get configuration key", "[-xyz] <key> [default]")
                          .withArgs<std::string, std::optional<std::string>>();
-const std::tuple commands { all, get };
+const auto encrypt = UnparsedCommand::create(
+                         "encrypt"
+                         "Encrypt the given files with the specified policy",
+                         "<policy> [file...]")
+                         .withArgs<std::string, std::vector<std::string>>();
+const std::tuple commands { all, get, encrypt };
 const auto parsedCommand = UnparsedCommand::parse(argc, argv, commands);
 
 if (parsedCommand.is(all)) {
@@ -37,8 +42,23 @@ if (parsedCommand.is(all)) {
     if (defaultValue) {
         std::cout << "default " << defaultValue.value() << std::endl;
     }
+} else if (parsedCommand.is(encrypt)) {
+    const auto [policy, files] = parsedCommand.getArgs(encrypt);
+    std::cout << "encrypt " << policy << std::endl;
+    for (const auto& file : files) {
+        std::cout << "file " << file << std::endl;
+    }
 } else {
         parsedCommand.help();
 }
 ```
 
+The following types are permitted as arguments and their usage rules are enforced during compilation:
+
+* `std::string`
+    * Mandatory argument
+* `std::optional<std::string>`
+    * Optional argument, cannot precede a mandatory argument
+* `std::vector<std::string>`
+    * Zero or more optional arguments, cannot precede a mandatory argument and cannot be combined with a `std::optional`
+      argument 

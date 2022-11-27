@@ -5,6 +5,7 @@
 #include <cassert>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -41,6 +42,14 @@ struct isOptional<std::optional<T>> : std::true_type {
 };
 
 template <typename T, typename Valid = void>
+struct isVector : std::false_type {
+};
+
+template <typename T>
+struct isVector<std::vector<T>> : std::true_type {
+};
+
+template <typename T, typename Valid = void>
 struct isVoid : std::false_type {
 };
 
@@ -63,6 +72,14 @@ struct isOptionalString : std::false_type {
 template <typename T>
 struct isOptionalString<T, std::enable_if_t<isOptional<T>::value && isString<typename T::value_type>::value>>
     : std::true_type {
+};
+
+template <typename T, typename Valid = void>
+struct isVectorOfStrings : std::false_type {
+};
+
+template <typename T>
+struct isVectorOfStrings<T, std::enable_if_t<std::is_same_v<T, std::vector<std::string>>>> : std::true_type {
 };
 
 // Adapted from cppreference:
@@ -95,6 +112,17 @@ constexpr bool allOf(InputIt first, InputIt last, UnaryPredicate p)
     return true;
 }
 
+template <class InputIt, class UnaryPredicate>
+constexpr bool anyOf(InputIt first, InputIt last, UnaryPredicate p)
+{
+    for (; first != last; ++first) {
+        if (p(*first)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 template <class... Ts>
 struct ArrayWrapper {
     constexpr ArrayWrapper(Ts... ts)
@@ -111,21 +139,50 @@ struct ArrayWrapper {
     value_type data[sizeof...(Ts)];
 };
 
+/// @brief Check that arguments which are mandatory are always expected before optional ones
 template <class... Types>
-constexpr bool hasNoPrecedingOptional()
+constexpr bool hasNoPrecedingOptionalArguments()
 {
-    // TODO: Remove ArrayWrapper once we can use a newer clang version.
-    //  The current one does not think std::array is a literal type
-    constexpr ArrayWrapper r { !isOptional<Types>::value... };
-    // constexpr std::array<bool, sizeof...(Types)> r { !isOptional<Types>::value... };
+    // TODO: Remove ArrayWrapper and replace with constexpr std::array<bool, sizeof...(Types)>
+    //  once we can use a newer clang version, since clang-8 does not think std::array is a literal type
+    constexpr ArrayWrapper r { !isOptional<Types>::value && !isVector<Types>::value... };
+    return isPartitioned(r.begin(), r.end(), [](auto v) { return v; });
+}
+
+/// @brief Check that if we have vector arguments they are always the last ones
+template <class... Types>
+constexpr bool hasNoPrecedingVector()
+{
+    constexpr ArrayWrapper r { !isVector<Types>::value... };
     return isPartitioned(r.begin(), r.end(), [](auto v) { return v; });
 }
 
 template <class... Types>
 constexpr bool hasAllowedTypes()
 {
-    constexpr ArrayWrapper r { isOptionalString<Types>::value || isVoid<Types>::value || isString<Types>::value... };
+    constexpr ArrayWrapper r { isOptionalString<Types>::value || isVoid<Types>::value || isString<Types>::value
+                               || isVectorOfStrings<Types>::value... };
     return allOf(r.begin(), r.end(), [](auto v) { return v; });
+}
+
+template <class T, class... Types>
+constexpr bool containsType()
+{
+    constexpr ArrayWrapper r { std::is_same_v<T, Types>... };
+    return anyOf(r.begin(), r.end(), [](auto v) { return v; });
+}
+
+template <class T, class... Types>
+constexpr std::size_t countType()
+{
+    constexpr ArrayWrapper r { std::is_same_v<T, Types>... };
+    std::size_t count { 0 };
+    for (const auto& v : r) {
+        if (v) {
+            ++count;
+        }
+    }
+    return count;
 }
 
 template <typename... Args>
@@ -133,12 +190,19 @@ class UnparsedCommandImpl
 {
 public:
     static_assert(
-        hasNoPrecedingOptional<Args...>(),
+        hasNoPrecedingOptionalArguments<Args...>(),
         "All optional arguments must be placed in the end of the "
         "argument list");
     static_assert(
         hasAllowedTypes<Args...>(),
-        "All arguments must either be void, std::string or std::optional<std::string>");
+        "All arguments must either be void, std::string, std::optional<std::string>, or std::vector<std::string>");
+    static_assert(
+        hasNoPrecedingVector<Args...>(),
+        "All vector arguments must be placed in the end of the argument list");
+    static_assert(countType<std::vector<std::string>, Args...>() <= 1, "At most one vector argument is allowed");
+    static_assert(
+        !(containsType<std::optional<std::string>, Args...>() && containsType<std::vector<std::string>, Args...>()),
+        "Cannot expect both std::optional<std::string> and std::vector<std::string> arguments");
 
     /**
      * @brief Default constructor to be used internally, users should use the normal constructor
@@ -174,35 +238,25 @@ public:
      * @brief Get the maximum expected number of arguments for this command
      *        If arguments is just void then return 0 otherwise return the size of arguments
      * @return The number of arguments
-     * @warning This function is only to be used mostly internally
+     * @warning This function is mostly to be used internally
      */
-    constexpr std::size_t getMaxArgCount() const { return hasNoArguments<Args...>() ? 0 : sizeof...(Args); }
-
-    /// Specialize getOptionalArgCount for when a command has no arguments
-    template <typename T = std::tuple<Args...>>
-    constexpr std::enable_if_t<std::is_same_v<T, std::tuple<void>>, std::size_t> getOptionalArgCount() const
+    constexpr std::size_t getMaxArgCount() const
     {
-        return 0;
+        if (hasNoArguments<Args...>()) {
+            return 0;
+        } else if (containsType<std::vector<std::string>, Args...>()) {
+            return std::numeric_limits<std::size_t>::max();
+        } else {
+            return sizeof...(Args);
+        }
     }
 
     /**
-     * @brief Count the number of std::optional occurrences in the supplied arguments
-     * @return The number of optional arguments
-     * @warning This function is only to be used mostly internally
+     * @brief Get the minimum expected number of arguments for this command
+     * @return the number of arguments
+     * @warning This function is mostly to be used internally
      */
-    template <typename T = std::tuple<Args...>>
-    constexpr std::enable_if_t<!std::is_same_v<T, std::tuple<void>>, std::size_t> getOptionalArgCount() const
-    {
-        // Count the number of std::optional inside Args
-        std::size_t optionalArgCount = 0;
-        details::visitTuple(ArgumentsType {}, [&optionalArgCount](auto&& arg) {
-            if constexpr (isOptional<std::decay_t<decltype(arg)>>::value) {
-                ++optionalArgCount;
-            }
-        });
-
-        return optionalArgCount;
-    }
+    constexpr std::size_t getRequiredArgCount() const { return countType<std::string, Args...>(); }
 
     using ArgumentsType = std::tuple<Args...>;
 
@@ -330,8 +384,7 @@ public:
                 if (command.id() == commandId) {
                     commandFound = true;
                     const auto expectedMaxNumberOfArguments = command.getMaxArgCount();
-                    const auto expectedMinNumberOfArguments
-                        = expectedMaxNumberOfArguments - command.getOptionalArgCount();
+                    const auto expectedMinNumberOfArguments = command.getRequiredArgCount();
                     if (unparsedArgs.size() < expectedMinNumberOfArguments
                         || unparsedArgs.size() > expectedMaxNumberOfArguments) {
                         std::cerr << "Wrong number of arguments for command: " << commandId << std::endl;
@@ -392,15 +445,18 @@ public:
             parsedArguments_,
             [&unparsedArgs, this, argumentIndex = 0U](auto&& argumentsToParse) mutable {
                 if (argumentIndex == commandIndex_.value()) {
-                    details::visitTuple(argumentsToParse, [&unparsedArgs, argumentIndex = 0U](auto&& arg) mutable {
-                        if (argumentIndex >= unparsedArgs.size()) {
-                            // We end up here when we have an optional argument that was not passed by the user In this
-                            // case we want to leave the argument in the error state that it is, i.e. nullopt
-                            return;
-                        }
-                        arg = unparsedArgs[argumentIndex];
-                        ++argumentIndex;
-                    });
+                    details::visitTuple(
+                        argumentsToParse,
+                        [&unparsedArgs, this, parsedArgumentIndex = 0U](auto&& arg) mutable {
+                            if (parsedArgumentIndex >= unparsedArgs.size()) {
+                                // We end up here when we are out of unparsed arguments. This can happen when:
+                                // We expected an optional argument that was not passed by the user in which case we
+                                // want to leave the argument in the error state that it is, i.e. nullopt
+                                return;
+                            }
+                            this->parseArgument(arg, unparsedArgs, parsedArgumentIndex);
+                            ++parsedArgumentIndex;
+                        });
                 }
                 ++argumentIndex;
             });
@@ -493,6 +549,21 @@ private:
         });
 
         return helpPrompt.str();
+    }
+
+    template <typename ArgumentType>
+    void parseArgument(ArgumentType& argToSet, const std::vector<std::string>& unparsedArgs, unsigned int& index)
+    {
+        argToSet = unparsedArgs[index];
+    }
+
+    void
+    parseArgument(std::vector<std::string>& argToSet, const std::vector<std::string>& unparsedArgs, unsigned int& index)
+    {
+        while (index < unparsedArgs.size()) {
+            argToSet.emplace_back(unparsedArgs[index]);
+            ++index;
+        }
     }
 };
 

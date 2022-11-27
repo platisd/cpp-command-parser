@@ -24,7 +24,12 @@ int main(int argc, char* argv[])
               .withArgs<std::string>();
     const auto verify
         = UnparsedCommand::create("verify", "Verify secret", "<key> <secret>").withArgs<std::string, std::string>();
-    const std::tuple commands { help, schema, defaults, all, list, get, clear, put, subscribe, verify };
+    const auto encrypt = UnparsedCommand::create(
+                             "encrypt"
+                             "Encrypt the given files with the specified policy",
+                             "<policy> [file...]")
+                             .withArgs<std::string, std::vector<std::string>>();
+    const std::tuple commands { help, schema, defaults, all, list, get, clear, put, subscribe, verify, encrypt };
     const auto parsedCommand = UnparsedCommand::parse(argc, argv, commands);
 
     if (parsedCommand.is(schema)) {
@@ -48,6 +53,12 @@ int main(int argc, char* argv[])
         std::cout << "get " << key << " " << x << " " << y << " " << z << std::endl;
         if (defaultValue) {
             std::cout << "default " << defaultValue.value() << std::endl;
+        }
+    } else if (parsedCommand.is(encrypt)) {
+        const auto [policy, files] = parsedCommand.getArgs(encrypt);
+        std::cout << "encrypt " << policy << std::endl;
+        for (const auto& file : files) {
+            std::cout << "file " << file << std::endl;
         }
     } else {
         auto helpPrompt = parsedCommand.help();
