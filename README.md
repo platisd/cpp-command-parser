@@ -1,6 +1,6 @@
 # Command Parser
 
-Command Parser is a header-only utility library for parsing command line "commands".
+Command Parser is a C++17 header-only utility library for parsing command line "commands".
 
 We define a _command_ as a string passed to a binary as a command line argument in the form of:
 
@@ -61,4 +61,20 @@ The following types are permitted as arguments and their usage rules are enforce
     * Optional argument, cannot precede a mandatory argument
 * `std::vector<std::string>`
     * Zero or more optional arguments, cannot precede a mandatory argument and cannot be combined with a `std::optional`
-      argument 
+      argument
+
+## Why not `insert your favorite CLI parsing library here`?
+
+In all fairness, this library was created under the misconception that [cxxopts](https://github.com/jarro2783/cxxopts)
+was not able to satisfy our use-case out of the box, which is **not** true. Some of its advantages are:
+
+* Compile-time check of argument count and types (i.e. you cannot "forget" to parse an argument or parse one that was
+  not expected)
+* Header-only
+* No dependencies
+* No macros
+* No exceptions
+
+## Acknowledgements
+
+This library was developed internally at [neat.no](https://neat.no) and is now open-sourced.
