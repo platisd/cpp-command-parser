@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Fetch compiler
         run: |
-          sudo apt-get install -y clang-11 clang++-11 clang-tidy
+          sudo apt-get install -y clang-11 clang++-11 clang-tidy-11
       - name: Checkout repository
         uses: actions/checkout@v2
       - name: Create build directory
@@ -28,7 +28,7 @@ jobs:
         run: cd ${build_dir} && cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
       - name: Run clang-tidy
         run: |
-          run-clang-tidy \
+          run-clang-tidy-11 \
             -p=build \
             -j$(nproc) \
             -header-filter include/* \
@@ -36,7 +36,6 @@ jobs:
             include/CommandParser.h example_main.cpp
       - name: Run clang-tidy-pr-comments action
         uses: platisd/clang-tidy-pr-comments@master
-        if: matrix.compiler.cc == 'clang-11'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           clang_tidy_fixes: clang-tidy-fixes.yaml
