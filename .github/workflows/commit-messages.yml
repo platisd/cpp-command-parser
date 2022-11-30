@@ -10,3 +10,4 @@ jobs:
         uses: platisd/bad-commit-message-blocker@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          remote_branch: main
