@@ -53,15 +53,26 @@ if (parsedCommand.is(all)) {
 }
 ```
 
-The following types are permitted as arguments and their usage rules are enforced during compilation:
+### Allowed types
+
+The following types are permitted as arguments. They are mandatory unless otherwise specified and their usage rules are
+enforced during compilation:
 
 * `std::string`
-    * Mandatory argument
-* `std::optional<std::string>`
-    * Optional argument, cannot precede a mandatory argument
-* `std::vector<std::string>`
-    * Zero or more optional arguments, cannot precede a mandatory argument and cannot be combined with a `std::optional`
-      argument
+* `bool`
+* `int`
+* `long`
+* `long long`
+* `unsigned long`
+* `unsigned long long`
+* `float`
+* `double`
+* `long double`
+* `std::optional<T>` where `T` is any of the above types
+    * Optional argument: May not be provided but must be at the end of the argument list
+* `std::vector<T>` where `T` is any of the above types
+    * Zero or more optional arguments: May be of any number or not provided, but cannot precede a mandatory argument and
+      cannot be combined with a `std::optional` argument
 
 ## Why not `insert your favorite CLI parsing library here`?
 
