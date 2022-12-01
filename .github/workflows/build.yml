@@ -1,6 +1,6 @@
 name: Build CI
 
-on: [push]
+on: [ push ]
 
 jobs:
 
@@ -11,8 +11,10 @@ jobs:
         compiler:
           - cc: gcc-10
             cxx: g++-10
-          - cc: clang-11
-            cxx: clang++-11
+          - cc: clang-8
+            cxx: clang++-8
+          - cc: clang-12
+            cxx: clang++-12
     env:
       CC: ${{ matrix.compiler.cc }}
       CXX: ${{ matrix.compiler.cxx }}
@@ -21,6 +23,7 @@ jobs:
     steps:
       - name: Fetch compiler
         run: |
+          sudo apt-get update
           sudo apt-get install -y ${{ matrix.compiler.cc }}
           sudo apt-get install -y ${{ matrix.compiler.cxx }}
       - name: Checkout repository
