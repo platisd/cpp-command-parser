@@ -69,6 +69,42 @@ template <>
 struct isAllowedType<void> : std::true_type {
 };
 
+template <>
+struct isAllowedType<int> : std::true_type {
+};
+
+template <>
+struct isAllowedType<long> : std::true_type {
+};
+
+template <>
+struct isAllowedType<long long> : std::true_type {
+};
+
+template <>
+struct isAllowedType<unsigned long> : std::true_type {
+};
+
+template <>
+struct isAllowedType<unsigned long long> : std::true_type {
+};
+
+template <>
+struct isAllowedType<float> : std::true_type {
+};
+
+template <>
+struct isAllowedType<double> : std::true_type {
+};
+
+template <>
+struct isAllowedType<long double> : std::true_type {
+};
+
+template <>
+struct isAllowedType<bool> : std::true_type {
+};
+
 // Adapted from cppreference:
 // https://en.cppreference.com/w/cpp/algorithm/is_partitioned
 template <class InputIt, class UnaryPredicate>
@@ -85,6 +121,19 @@ constexpr bool isPartitioned(InputIt first, InputIt last, UnaryPredicate p)
         }
     }
     return true;
+}
+
+// constexpr std::count it's not available in C++17 from https://en.cppreference.com/w/cpp/algorithm/count
+template <class InputIt, class T>
+constexpr typename std::iterator_traits<InputIt>::difference_type count(InputIt first, InputIt last, const T& value)
+{
+    typename std::iterator_traits<InputIt>::difference_type n = 0;
+    for (; first != last; ++first) {
+        if (*first == value) {
+            ++n;
+        }
+    }
+    return n;
 }
 
 // constexpr std::all_of because it's not available in C++17
@@ -187,7 +236,8 @@ public:
         "argument list");
     static_assert(
         hasAllowedTypes<Args...>(),
-        "All arguments must either be void, std::string, std::optional<std::string>, or std::vector<std::string>");
+        "All arguments be one of the following: void, bool, int, long, long long, unsigned long, unsigned long long, "
+        "float, double, long double, std::string, std::optional<std::string>, std::vector<std::string>");
     static_assert(
         hasNoPrecedingVector<Args...>(),
         "All vector arguments must be placed in the end of the argument list");
@@ -237,7 +287,8 @@ public:
         if (hasNoArguments<Args...>()) {
             return 0;
         }
-        if (containsType<std::vector<std::string>, Args...>()) {
+        constexpr ArrayWrapper r { isVector<Args>::value... };
+        if (anyOf(r.begin(), r.end(), [](auto v) { return v; })) {
             return std::numeric_limits<std::size_t>::max();
         }
         return sizeof...(Args);
@@ -248,7 +299,12 @@ public:
      * @return the number of arguments
      * @warning This function is mostly to be used internally
      */
-    constexpr std::size_t getRequiredArgCount() const { return countType<std::string, Args...>(); }
+    constexpr std::size_t getRequiredArgCount() const
+    {
+        constexpr ArrayWrapper r { !isOptional<Args>::value && !isVector<Args>::value
+                                   && !std::is_same_v<void, Args>... };
+        return count(r.begin(), r.end(), true);
+    }
 
     using ArgumentsType = std::tuple<Args...>;
 
@@ -357,7 +413,7 @@ public:
         std::vector<std::string> unparsedArgs {};
         std::vector<std::string> unparsedOptions {};
         for (int i = 2; i < argc; ++i) {
-            if (argv[i][0] == '-') {
+            if (argv[i][0] == '-' && !std::isdigit(argv[i][1], std::locale::classic())) {
                 std::string_view option { argv[i] };
                 option.remove_prefix(std::min(option.find_first_not_of('-'), option.size())); // Remove all leading '-'
                 unparsedOptions.emplace_back(option.data());
@@ -547,6 +603,52 @@ private:
     void parseArgument(ArgumentType& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)
     {
         argToSet = unparsedArgs[index];
+    }
+
+    void parseArgument(int& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)
+    {
+        argToSet = std::stoi(unparsedArgs[index]);
+    }
+
+    void parseArgument(long& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)
+    {
+        argToSet = std::stol(unparsedArgs[index]);
+    }
+
+    void parseArgument(long long& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)
+    {
+        argToSet = std::stoll(unparsedArgs[index]);
+    }
+
+    void parseArgument(unsigned long& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)
+    {
+        argToSet = std::stoul(unparsedArgs[index]);
+    }
+
+    void
+    parseArgument(unsigned long long& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)
+    {
+        argToSet = std::stoull(unparsedArgs[index]);
+    }
+
+    void parseArgument(float& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)
+    {
+        argToSet = std::stof(unparsedArgs[index]);
+    }
+
+    void parseArgument(double& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)
+    {
+        argToSet = std::stod(unparsedArgs[index]);
+    }
+
+    void parseArgument(long double& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)
+    {
+        argToSet = std::stold(unparsedArgs[index]);
+    }
+
+    void parseArgument(bool& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)
+    {
+        argToSet = unparsedArgs[index] == "true";
     }
 
     void

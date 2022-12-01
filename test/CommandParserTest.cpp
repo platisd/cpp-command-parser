@@ -528,3 +528,71 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentAndVectorExpectedButArgume
     EXPECT_EQ(parsedFirstArgument, mandatoryArgument);
     EXPECT_TRUE(parsedVector.empty());
 }
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentIsSupportedNumericTypeWillParse)
+{
+    std::string expectedCommand { "dummyCommand" };
+    int expectedInteger { std::numeric_limits<int>::min() };
+    long expectedLong { std::numeric_limits<long>::min() };
+    unsigned long expectedUnsignedLong { std::numeric_limits<unsigned long>::max() };
+    long long expectedLongLong { std::numeric_limits<long long>::max() };
+    unsigned long long expectedUnsignedLongLong { std::numeric_limits<unsigned long long>::max() };
+    float expectedFloat { -164223.123f }; // std::to_string does not play well with floating point min()
+    double expectedDouble { std::numeric_limits<double>::max() };
+    long double expectedLongDouble { std::numeric_limits<long double>::max() };
+
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s)
+                       .withArgs<int, long, unsigned long, long long, unsigned long long, float, double, long double>();
+    constexpr int argc = 10;
+    std::array<std::string, argc> arguments { "binary"s,
+                                              expectedCommand,
+                                              std::to_string(expectedInteger),
+                                              std::to_string(expectedLong),
+                                              std::to_string(expectedUnsignedLong),
+                                              std::to_string(expectedLongLong),
+                                              std::to_string(expectedUnsignedLongLong),
+                                              std::to_string(expectedFloat),
+                                              std::to_string(expectedDouble),
+                                              std::to_string(expectedLongDouble) };
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    auto
+        [parsedInteger,
+         parsedLong,
+         parsedUnsignedLong,
+         parsedLongLong,
+         parsedUnsignedLongLong,
+         parsedFloat,
+         parsedDouble,
+         parsedLongDouble]
+        = parsedCommand.getArgs(command);
+    EXPECT_EQ(parsedInteger, expectedInteger);
+    EXPECT_EQ(parsedLong, expectedLong);
+    EXPECT_EQ(parsedUnsignedLong, expectedUnsignedLong);
+    EXPECT_EQ(parsedLongLong, expectedLongLong);
+    EXPECT_EQ(parsedUnsignedLongLong, expectedUnsignedLongLong);
+    EXPECT_EQ(parsedFloat, expectedFloat);
+    EXPECT_EQ(parsedDouble, expectedDouble);
+    EXPECT_EQ(parsedLongDouble, expectedLongDouble);
+}
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentIsBoolean_WillParse)
+{
+    std::string expectedCommand { "dummyCommand" };
+    bool expectedTrue { true };
+    bool expectedFalse { false };
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s).withArgs<bool, bool>();
+    constexpr int argc = 4;
+    std::array<std::string, argc> arguments { "binary"s, expectedCommand, "true", "false" };
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    auto [firstArgument, secondArgument] = parsedCommand.getArgs(command);
+    EXPECT_EQ(firstArgument, expectedTrue);
+    EXPECT_EQ(secondArgument, expectedFalse);
+}
