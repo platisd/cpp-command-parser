@@ -9,18 +9,18 @@ jobs:
     strategy:
       matrix:
         compiler:
-          - cc: clang-11
-            cxx: clang++-11
+          - cc: clang-12
+            cxx: clang++-12
     env:
-      CC: clang-11
-      CXX: clang++-11
+      CC: clang-12
+      CXX: clang++-12
       build_dir: build
 
     steps:
       - name: Fetch compiler
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-11 clang++-11 clang-tidy-11
+          sudo apt-get install -y clang-12 clang++-12 clang-tidy-12
       - name: Checkout repository
         uses: actions/checkout@v2
       - name: Create build directory
@@ -29,7 +29,7 @@ jobs:
         run: cd ${build_dir} && cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
       - name: Run clang-tidy
         run: |
-          run-clang-tidy-11 \
+          run-clang-tidy-12 \
             -p=build \
             -j$(nproc) \
             -header-filter include/* \
