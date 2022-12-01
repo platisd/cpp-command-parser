@@ -49,37 +49,24 @@ template <typename T>
 struct isVector<std::vector<T>> : std::true_type {
 };
 
-template <typename T, typename Valid = void>
-struct isVoid : std::false_type {
-};
-
 template <typename T>
-struct isVoid<T, std::enable_if_t<std::is_same_v<T, void>>> : std::true_type {
+struct isAllowedType : std::false_type {
 };
 
-template <typename T, typename Valid = void>
-struct isString : std::false_type {
+template <>
+struct isAllowedType<std::string> : std::true_type {
 };
 
-template <typename T>
-struct isString<T, std::enable_if_t<std::is_same_v<T, std::string>>> : std::true_type {
+template <>
+struct isAllowedType<std::vector<std::string>> : std::true_type {
 };
 
-template <typename T, typename Valid = void>
-struct isOptionalString : std::false_type {
+template <>
+struct isAllowedType<std::optional<std::string>> : std::true_type {
 };
 
-template <typename T>
-struct isOptionalString<T, std::enable_if_t<isOptional<T>::value && isString<typename T::value_type>::value>>
-    : std::true_type {
-};
-
-template <typename T, typename Valid = void>
-struct isVectorOfStrings : std::false_type {
-};
-
-template <typename T>
-struct isVectorOfStrings<T, std::enable_if_t<std::is_same_v<T, std::vector<std::string>>>> : std::true_type {
+template <>
+struct isAllowedType<void> : std::true_type {
 };
 
 // Adapted from cppreference:
@@ -166,8 +153,7 @@ constexpr bool hasNoPrecedingVector()
 template <class... Types>
 constexpr bool hasAllowedTypes()
 {
-    constexpr ArrayWrapper r { isOptionalString<Types>::value || isVoid<Types>::value || isString<Types>::value
-                               || isVectorOfStrings<Types>::value... };
+    constexpr ArrayWrapper r { isAllowedType<Types>::value... };
     return allOf(r.begin(), r.end(), [](auto v) { return v; });
 }
 
