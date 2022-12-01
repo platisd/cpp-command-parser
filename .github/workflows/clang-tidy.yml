@@ -1,6 +1,6 @@
 name: clang-tidy CI
 
-on: [pull_request]
+on: [ pull_request ]
 
 jobs:
 
@@ -19,6 +19,7 @@ jobs:
     steps:
       - name: Fetch compiler
         run: |
+          sudo apt-get update
           sudo apt-get install -y clang-11 clang++-11 clang-tidy-11
       - name: Checkout repository
         uses: actions/checkout@v2
