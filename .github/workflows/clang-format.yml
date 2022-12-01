@@ -1,6 +1,6 @@
 name: clang-format CI
 
-on: [push]
+on: [ push ]
 
 jobs:
 
@@ -9,6 +9,7 @@ jobs:
     steps:
       - name: Fetch clang-format
         run: |
+          sudo apt-get update
           sudo apt-get install clang-format
       - name: Checkout repository
         uses: actions/checkout@v2
