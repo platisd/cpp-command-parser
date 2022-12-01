@@ -58,14 +58,6 @@ struct isAllowedType<std::string> : std::true_type {
 };
 
 template <>
-struct isAllowedType<std::vector<std::string>> : std::true_type {
-};
-
-template <>
-struct isAllowedType<std::optional<std::string>> : std::true_type {
-};
-
-template <>
 struct isAllowedType<void> : std::true_type {
 };
 
@@ -103,6 +95,14 @@ struct isAllowedType<long double> : std::true_type {
 
 template <>
 struct isAllowedType<bool> : std::true_type {
+};
+
+template <typename T>
+struct isAllowedType<std::vector<T>> : isAllowedType<T> {
+};
+
+template <typename T>
+struct isAllowedType<std::optional<T>> : isAllowedType<T> {
 };
 
 // Adapted from cppreference:
@@ -206,24 +206,23 @@ constexpr bool hasAllowedTypes()
     return allOf(r.begin(), r.end(), [](auto v) { return v; });
 }
 
-template <class T, class... Types>
-constexpr bool containsType()
+template <class... Types>
+constexpr bool doesNotContainBothOptionalAndVector()
 {
-    constexpr ArrayWrapper r { std::is_same_v<T, Types>... };
-    return anyOf(r.begin(), r.end(), [](auto v) { return v; });
+    constexpr ArrayWrapper optionals { isOptional<Types>::value... };
+    constexpr auto optionalArguments = count(optionals.begin(), optionals.end(), true);
+    constexpr ArrayWrapper vectors { isVector<Types>::value... };
+    constexpr auto vectorArguments = count(vectors.begin(), vectors.end(), true);
+
+    return optionalArguments == 0 || vectorArguments == 0;
 }
 
-template <class T, class... Types>
-constexpr std::size_t countType()
+template <class... Types>
+constexpr bool containsAtMostOneVector()
 {
-    constexpr ArrayWrapper r { std::is_same_v<T, Types>... };
-    std::size_t count { 0 };
-    for (const auto& v : r) {
-        if (v) {
-            ++count;
-        }
-    }
-    return count;
+    constexpr ArrayWrapper vectors { isVector<Types>::value... };
+
+    return count(vectors.begin(), vectors.end(), true) <= 1;
 }
 
 template <typename... Args>
@@ -236,15 +235,15 @@ public:
         "argument list");
     static_assert(
         hasAllowedTypes<Args...>(),
-        "All arguments be one of the following: void, bool, int, long, long long, unsigned long, unsigned long long, "
-        "float, double, long double, std::string, std::optional<std::string>, std::vector<std::string>");
+        "All arguments be one of the following: bool, int, long, long long, unsigned long, unsigned long long, "
+        "float, double, long double, std::string and their std::optional and std::vector variants");
     static_assert(
         hasNoPrecedingVector<Args...>(),
         "All vector arguments must be placed in the end of the argument list");
-    static_assert(countType<std::vector<std::string>, Args...>() <= 1, "At most one vector argument is allowed");
+    static_assert(containsAtMostOneVector<Args...>(), "At most one vector argument is allowed");
     static_assert(
-        !(containsType<std::optional<std::string>, Args...>() && containsType<std::vector<std::string>, Args...>()),
-        "Cannot expect both std::optional<std::string> and std::vector<std::string> arguments");
+        doesNotContainBothOptionalAndVector<Args...>(),
+        "Cannot expect both std::optional and std::vector arguments");
 
     /**
      * @brief Default constructor to be used internally, users should use the normal constructor
@@ -651,13 +650,23 @@ private:
         argToSet = unparsedArgs[index] == "true";
     }
 
-    void
-    parseArgument(std::vector<std::string>& argToSet, const std::vector<std::string>& unparsedArgs, unsigned int& index)
+    template <typename E>
+    void parseArgument(std::vector<E>& argToSet, const std::vector<std::string>& unparsedArgs, unsigned int& index)
     {
         while (index < unparsedArgs.size()) {
-            argToSet.emplace_back(unparsedArgs[index]);
+            E element {};
+            parseArgument(element, unparsedArgs, index);
+            argToSet.emplace_back(element);
             ++index;
         }
+    }
+    template <typename E>
+    void
+    parseArgument(std::optional<E>& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)
+    {
+        E element {};
+        parseArgument(element, unparsedArgs, index);
+        argToSet = element;
     }
 };
 
