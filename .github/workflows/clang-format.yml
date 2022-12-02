@@ -1,4 +1,4 @@
-name: clang-format CI
+name: clang-format
 
 on: [ push ]
 
