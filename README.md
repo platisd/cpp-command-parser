@@ -1,5 +1,7 @@
 # Command Parser
 
+[![codecov](https://codecov.io/gh/platisd/cpp-command-parser/branch/main/graph/badge.svg?token=MNGCSVLIUM)](https://codecov.io/gh/platisd/cpp-command-parser) [![Build, unit tests and coverage CI](https://github.com/platisd/cpp-command-parser/actions/workflows/build-ut-coverage.yml/badge.svg)](https://github.com/platisd/cpp-command-parser/actions/workflows/build-ut-coverage.yml) [![clang-format CI](https://github.com/platisd/cpp-command-parser/actions/workflows/clang-format.yml/badge.svg)](https://github.com/platisd/cpp-command-parser/actions/workflows/clang-format.yml) [![clang-tidy CI](https://github.com/platisd/cpp-command-parser/actions/workflows/clang-tidy.yml/badge.svg)](https://github.com/platisd/cpp-command-parser/actions/workflows/clang-tidy.yml) [![Commit messages](https://github.com/platisd/cpp-command-parser/actions/workflows/commit-messages.yml/badge.svg)](https://github.com/platisd/cpp-command-parser/actions/workflows/commit-messages.yml)
+
 Command Parser is a C++17 header-only utility library for parsing command line "commands".
 
 We define a _command_ as a string passed to a binary as a command line argument in the form of:
