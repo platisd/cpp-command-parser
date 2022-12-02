@@ -4,3 +4,4 @@ build
 cmake-build-debug
 cmake-build-debug-coverage/
 clang-tidy-fixes.yaml
+coverage.info
