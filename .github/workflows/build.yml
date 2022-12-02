@@ -21,9 +21,10 @@ jobs:
       build_dir: build
 
     steps:
-      - name: Fetch compiler
+      - name: Fetch dependencies
         run: |
           sudo apt-get update
+          sudo apt-get install -y lcov
           sudo apt-get install -y ${{ matrix.compiler.cc }}
           sudo apt-get install -y ${{ matrix.compiler.cxx }}
       - name: Checkout repository
@@ -31,8 +32,20 @@ jobs:
       - name: Create build directory
         run: mkdir -p ${build_dir}
       - name: Configure project
-        run: cd ${build_dir} && cmake ..
+        run: cd ${build_dir} && cmake -DCODE_COVERAGE=ON ..
       - name: Build project
         run: cmake --build ${build_dir} -- -j$(nproc)
       - name: Run unit tests
         run: cd ${build_dir} && ctest
+      - name: Generate coverage report
+        if: matrix.compiler.cc == 'gcc-10'
+        run: |
+          lcov --directory . --capture --output-file coverage.info
+          lcov --include "*CommandParser.h*" --directory . --capture --output-file coverage.info
+          lcov --list coverage.info
+      - name: Upload coverage report
+        if: matrix.compiler.cc == 'gcc-10'
+        uses: codecov/codecov-action@v3
+        with:
+          files: coverage.info
+          fail_ci_if_error: true
