@@ -1,4 +1,4 @@
-name: clang-tidy CI
+name: clang-tidy
 
 on: [ pull_request ]
 

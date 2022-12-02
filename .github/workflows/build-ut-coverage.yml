@@ -1,4 +1,4 @@
-name: Build, unit tests and coverage CI
+name: Build, UT, coverage
 
 on: [ push ]
 
