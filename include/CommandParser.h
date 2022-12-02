@@ -175,7 +175,7 @@ template <class... Ts>
 class ArrayWrapper
 {
 public:
-    explicit constexpr ArrayWrapper(Ts... ts)
+    constexpr ArrayWrapper(Ts... ts)
         : data { ts... }
     {
     }
@@ -311,8 +311,9 @@ public:
         constexpr ArrayWrapper r { isVector<Args>::value... };
         if (anyOf(r.begin(), r.end(), [](auto v) { return v; })) {
             return std::numeric_limits<std::size_t>::max();
+        } else {
+            return sizeof...(Args);
         }
-        return sizeof...(Args);
     }
 
     /**
