@@ -231,8 +231,7 @@ class UnparsedCommandImpl
 public:
     static_assert(
         hasNoPrecedingOptionalArguments<Args...>(),
-        "All optional arguments must be placed in the end of the "
-        "argument list");
+        "All optional arguments must be placed in the end of the argument list");
     static_assert(
         hasAllowedTypes<Args...>(),
         "All arguments be one of the following: bool, int, long, long long, unsigned long, unsigned long long, "
