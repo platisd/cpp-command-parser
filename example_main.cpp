@@ -66,5 +66,10 @@ int main(int argc, char* argv[])
         std::cerr << helpPrompt << std::endl;
     }
 
+    using namespace CommandParser::literals;
+
+    const auto o = "someIntKey"_i;
+    (void) o;
+
     return 0;
 }

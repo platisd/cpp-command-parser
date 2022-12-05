@@ -388,6 +388,25 @@ constexpr auto transformUnparsedArgumentsType(std::tuple<T...>)
         std::tuple<std::any>,
         typename T::ArgumentsType>...> {};
 }
+
+template <typename T>
+class CommandParserOption
+{
+public:
+    static_assert(!details::isVector<T>::value, "CommandParserOption cannot be a vector");
+
+    explicit CommandParserOption(std::string name)
+        : name_ { std::move(name) }
+    {
+    }
+
+    std::string name() const { return name_; }
+
+    using Type = T;
+
+private:
+    std::string name_;
+};
 } // namespace details
 
 template <typename T>
@@ -698,3 +717,69 @@ ParsedCommandImpl<T> parse(int argc, char* argv[], const T& unparsedCommands)
     return ParsedCommandImpl<T> { argc, argv, unparsedCommands };
 }
 } // namespace UnparsedCommand
+
+namespace CommandParser {
+namespace literals {
+
+auto operator"" _i(const char* optionName, std::size_t size)
+{
+
+    return details::CommandParserOption<int> { std::string(optionName, size) };
+}
+
+auto operator"" _l(const char* optionName, std::size_t size)
+{
+
+    return details::CommandParserOption<long> { std::string(optionName, size) };
+}
+
+auto operator"" _ll(const char* optionName, std::size_t size)
+{
+
+    return details::CommandParserOption<long long> { std::string(optionName, size) };
+}
+
+auto operator"" _ul(const char* optionName, std::size_t size)
+{
+
+    return details::CommandParserOption<unsigned long> { std::string(optionName, size) };
+}
+
+auto operator"" _ull(const char* optionName, std::size_t size)
+{
+
+    return details::CommandParserOption<unsigned long long> { std::string(optionName, size) };
+}
+
+auto operator"" _f(const char* optionName, std::size_t size)
+{
+
+    return details::CommandParserOption<float> { std::string(optionName, size) };
+}
+
+auto operator"" _d(const char* optionName, std::size_t size)
+{
+
+    return details::CommandParserOption<double> { std::string(optionName, size) };
+}
+
+auto operator"" _ld(const char* optionName, std::size_t size)
+{
+
+    return details::CommandParserOption<long double> { std::string(optionName, size) };
+}
+
+auto operator"" _b(const char* optionName, std::size_t size)
+{
+
+    return details::CommandParserOption<bool> { std::string(optionName, size) };
+}
+
+auto operator"" _s(const char* optionName, std::size_t size)
+{
+
+    return details::CommandParserOption<std::string> { std::string(optionName, size) };
+}
+
+} // namespace literals
+} // namespace CommandParser
