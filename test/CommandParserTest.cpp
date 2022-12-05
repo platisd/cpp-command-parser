@@ -311,6 +311,33 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenKnownOptions_WillReturnOptions)
     EXPECT_EQ(parsedCommand.getUnknownOptions().size(), 0);
 }
 
+TEST(CommandParserTest, ParsedCommandImpl_WhenOptionsSuppliedInMultipleSteps_WillParseAllOptions)
+{
+    std::string expectedCommand { "dummyCommand" };
+    std::string firstExpectedOption { "f" };
+    std::string secondExpectedOption { "secondOption" };
+    std::string thirdExpectedOption { "someThirdOption" };
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s)
+                       .withOptions({ firstExpectedOption, secondExpectedOption })
+                       .withOptions({ thirdExpectedOption });
+    constexpr int argc = 5;
+    std::string firstArgument { "firstArgument" };
+    std::array<std::string, argc> arguments { "binary"s,
+                                              expectedCommand,
+                                              "-" + firstExpectedOption,
+                                              "--" + secondExpectedOption,
+                                              "-" + thirdExpectedOption };
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    EXPECT_TRUE(parsedCommand.hasOption(firstExpectedOption));
+    EXPECT_TRUE(parsedCommand.hasOption(secondExpectedOption));
+    EXPECT_TRUE(parsedCommand.hasOption(thirdExpectedOption));
+    EXPECT_EQ(parsedCommand.getUnknownOptions().size(), 0);
+}
+
 TEST(CommandParserTest, ParsedCommandImpl_WhenCompoundOptions_WillReturnOptions)
 {
     std::string expectedCommand { "dummyCommand" };

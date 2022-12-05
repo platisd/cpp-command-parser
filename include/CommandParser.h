@@ -353,9 +353,10 @@ public:
      * @brief Construct a new command with the specified options
      * @return The command options
      */
-    UnparsedCommandImpl<Args...> withOptions(const std::unordered_set<std::string>& options) const
+    UnparsedCommandImpl<Args...> withOptions(std::unordered_set<std::string> options) const
     {
-        return UnparsedCommandImpl<Args...> { id_, description_, usage_, options };
+        options.insert(options_.begin(), options_.end());
+        return UnparsedCommandImpl<Args...> { id_, description_, usage_, std::move(options) };
     }
 
 private:
