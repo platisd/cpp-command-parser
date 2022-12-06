@@ -225,6 +225,11 @@ constexpr bool containsAtMostOneVector()
     return count(vectors.begin(), vectors.end(), true) <= 1;
 }
 
+constexpr void removeAllLeadingDashes(std::string_view& view)
+{
+    view.remove_prefix(std::min(view.find_first_not_of('-'), view.size()));
+}
+
 template <typename... Args>
 class UnparsedCommandImpl
 {
@@ -355,8 +360,15 @@ public:
      */
     UnparsedCommandImpl<Args...> withOptions(std::unordered_set<std::string> options) const
     {
-        options.insert(options_.begin(), options_.end());
-        return UnparsedCommandImpl<Args...> { id_, description_, usage_, std::move(options) };
+        // Be forgiving to the user misunderstanding the API usage and strip any leading dashes
+        std::unordered_set<std::string> sanitizedOptions(options.size());
+        for (const auto& option : options) {
+            auto view = std::string_view { option };
+            removeAllLeadingDashes(view);
+            sanitizedOptions.emplace(view);
+        }
+        sanitizedOptions.insert(options_.begin(), options_.end());
+        return UnparsedCommandImpl<Args...> { id_, description_, usage_, std::move(sanitizedOptions) };
     }
 
 private:
@@ -414,7 +426,7 @@ public:
         for (int i = 2; i < argc; ++i) {
             if (argv[i][0] == '-' && !std::isdigit(argv[i][1], std::locale::classic())) {
                 std::string_view option { argv[i] };
-                option.remove_prefix(std::min(option.find_first_not_of('-'), option.size())); // Remove all leading '-'
+                details::removeAllLeadingDashes(option);
                 unparsedOptions.emplace_back(option.data());
             } else {
                 unparsedArgs.emplace_back(argv[i]);
@@ -550,7 +562,13 @@ public:
      * @param option
      * @return true if the option was encountered, false otherwise
      */
-    bool hasOption(const std::string& option) const { return parsedOptions_.find(option) != parsedOptions_.end(); }
+    bool hasOption(const std::string& option) const
+    {
+        // Let's be forgiving if someone looks for "--option" instead of "option"
+        std::string_view view { option };
+        details::removeAllLeadingDashes(view);
+        return parsedOptions_.find(std::string { view }) != parsedOptions_.end();
+    }
 
     /**
      * @brief Get any unknown options encountered during parsing

@@ -810,3 +810,24 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenInvalidNumericalArgument_WillCrash
 
     EXPECT_ANY_THROW(UnparsedCommand::parse(argc, argv.data(), commands));
 }
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenOptionSuppliedWithDashes_WillForgiveAndParse)
+{
+    std::string expectedCommand { "dummyCommand" };
+    std::string firstOption { "--firstFlag" };
+    std::string secondOption { "-secondFlag" };
+    std::string thirdOption { "--thirdUnknownFlag" };
+    auto command
+        = UnparsedCommand::create(expectedCommand, "dummyDescription"s).withOptions({ firstOption, secondOption });
+    constexpr int argc = 5;
+    std::array<std::string, argc> arguments { "binary"s, expectedCommand, firstOption, secondOption, thirdOption };
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    EXPECT_TRUE(parsedCommand.hasOption(firstOption));
+    EXPECT_TRUE(parsedCommand.hasOption(secondOption));
+    EXPECT_FALSE(parsedCommand.hasOption(thirdOption));
+    EXPECT_EQ(parsedCommand.getUnknownOptions().size(), 1);
+}
