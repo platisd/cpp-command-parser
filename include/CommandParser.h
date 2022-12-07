@@ -665,7 +665,12 @@ private:
 
     void parseArgument(bool& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)
     {
-        argToSet = unparsedArgs[index] == "true";
+        for (const auto& trueValue : { "true", "True", "TRUE", "1", "on" }) {
+            if (unparsedArgs[index] == trueValue) {
+                argToSet = true;
+                return;
+            }
+        }
     }
 
     template <typename E>
