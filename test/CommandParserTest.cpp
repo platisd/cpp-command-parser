@@ -850,3 +850,58 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenOptionSuppliedWithDashes_WillForgi
     EXPECT_FALSE(parsedCommand.hasOption(thirdOption));
     EXPECT_EQ(parsedCommand.getUnknownOptions().size(), 1);
 }
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentHasAlias_WillParseAliasToo)
+{
+    std::string expectedCommand { "dummyCommand" };
+    std::string firstAlias { "firstAlias" };
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s).withAliases({ firstAlias });
+    constexpr int argc = 2;
+    std::array<std::string, argc> arguments { "binary"s, firstAlias };
+
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    EXPECT_TRUE(parsedCommand.is(command));
+}
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentHasMultipleAliases_WillParseAliasesToo)
+{
+    std::string expectedCommand { "dummyCommand" };
+    std::string firstAlias { "firstAlias" };
+    std::string secondAlias { "-secondAlias" };
+    auto command
+        = UnparsedCommand::create(expectedCommand, "dummyDescription"s).withAliases({ firstAlias, secondAlias });
+    constexpr int argc = 2;
+    std::array<std::string, argc> arguments { "binary"s, secondAlias };
+
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    EXPECT_TRUE(parsedCommand.is(command));
+}
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentHasMultipleAliasesDeclaredInMultipleStages_WillParseAliasesToo)
+{
+    std::string expectedCommand { "dummyCommand" };
+    std::string firstAlias { "firstAlias" };
+    std::string secondAlias { "-secondAlias" };
+    std::string thirdAlias { "thirdAlias" };
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s)
+                       .withAliases({ firstAlias, secondAlias })
+                       .withAliases({ thirdAlias });
+    constexpr int argc = 2;
+    std::array<std::string, argc> firstArguments { "binary"s, secondAlias };
+    std::array<std::string, argc> secondArguments { "binary"s, thirdAlias };
+
+    auto firstArgv = toArgv(firstArguments);
+    auto secondArgv = toArgv(secondArguments);
+    std::tuple commands { command };
+
+    auto firstParsedCommand = UnparsedCommand::parse(argc, firstArgv.data(), commands);
+    EXPECT_TRUE(firstParsedCommand.is(command));
+    auto secondParsedCommand = UnparsedCommand::parse(argc, secondArgv.data(), commands);
+    EXPECT_TRUE(secondParsedCommand.is(command));
+}

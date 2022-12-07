@@ -258,16 +258,19 @@ public:
     /**
      * @brief Construct an unparsed command
      * @param id The command "ID" (e.g. "help")
+     * @param aliases The command aliases (e.g. "h")
      * @param description
      * @param usage How to use the command (e.g. "help [command]")
      * @warning Users should probably use the helper function `UnparsedCommand::create`
      */
     UnparsedCommandImpl(
         std::string id,
+        std::unordered_set<std::string> aliases,
         std::string description,
         std::string usage,
         std::unordered_set<std::string> options)
         : id_ { std::move(id) }
+        , aliases_ { aliases }
         , description_ { std::move(description) }
         , usage_ { std::move(usage) }
         , options_ { std::move(options) }
@@ -318,6 +321,13 @@ public:
     std::string id() const { return id_; };
 
     /**
+     * @brief Check if the supplied command ID matches the ID or the aliases of this command
+     * @param command
+     * @return true if the command ID matches the ID or the aliases, false otherwise
+     */
+    bool matches(const std::string& command) const { return command == id_ || aliases_.count(command) > 0; }
+
+    /**
      * @brief Get the command description
      * @return The command description
      */
@@ -351,12 +361,12 @@ public:
     template <typename... T>
     UnparsedCommandImpl<T...> withArgs() const
     {
-        return UnparsedCommandImpl<T...> { id_, description_, usage_, options_ };
+        return UnparsedCommandImpl<T...> { id_, aliases_, description_, usage_, options_ };
     }
 
     /**
      * @brief Construct a new command with the specified options
-     * @return The command options
+     * @return A new command with the additional options
      */
     UnparsedCommandImpl<Args...> withOptions(std::unordered_set<std::string> options) const
     {
@@ -368,11 +378,22 @@ public:
             sanitizedOptions.emplace(view);
         }
         sanitizedOptions.insert(options_.begin(), options_.end());
-        return UnparsedCommandImpl<Args...> { id_, description_, usage_, std::move(sanitizedOptions) };
+        return UnparsedCommandImpl<Args...> { id_, aliases_, description_, usage_, std::move(sanitizedOptions) };
+    }
+
+    /**
+     * @brief Construct a new command with the specified ID aliases
+     * @return A new command with the additional IDs
+     */
+    UnparsedCommandImpl<Args...> withAliases(std::unordered_set<std::string> aliases) const
+    {
+        aliases.insert(aliases_.begin(), aliases_.end());
+        return UnparsedCommandImpl<Args...> { id_, std::move(aliases), description_, usage_, options_ };
     }
 
 private:
     std::string id_ {};
+    std::unordered_set<std::string> aliases_ {};
     std::string description_ {};
     std::string usage_ {};
     std::unordered_set<std::string> options_ {};
@@ -440,7 +461,7 @@ public:
             commands,
             [&commandId, &commandFound, &unparsedArgs, &commandHasCorrectArguments, &unparsedOptions, this, index = 0U](
                 auto&& command) mutable {
-                if (command.id() == commandId) {
+                if (command.matches(commandId)) {
                     commandFound = true;
                     const auto expectedMaxNumberOfArguments = command.getMaxArgCount();
                     const auto expectedMinNumberOfArguments = command.getRequiredArgCount();
@@ -462,7 +483,7 @@ public:
                     } else {
                         commandHasCorrectArguments = true;
                         commandIndex_ = index;
-                        commandId_ = commandId;
+                        commandId_ = command.id();
                         // Match options
                         for (const auto& unparsedOption : unparsedOptions) {
                             // Match stand-alone options
@@ -519,8 +540,6 @@ public:
                 }
                 ++argumentIndex;
             });
-
-        commandId_ = commandId;
     }
 
     /**
@@ -704,7 +723,7 @@ namespace UnparsedCommand {
 inline details::UnparsedCommandImpl<void>
 create(const std::string& id, const std::string& description, const std::string& usage = "")
 {
-    return details::UnparsedCommandImpl<void> { id, description, usage, {} };
+    return details::UnparsedCommandImpl<void> { id, {}, description, usage, {} };
 }
 
 /**
