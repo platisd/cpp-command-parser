@@ -626,7 +626,7 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentIsBoolean_WillParse)
 
 TEST(CommandParserTest, ParsedCommandImpl_WhenVectorOfIntegers_WillParse)
 {
-    std::string expectedCommand { "dummyCommand" };
+    std::string expectedCommand { "dummy-Command" };
     std::vector<int> expectedVector { 1, -2, 3, 4, 5 };
     auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s).withArgs<std::vector<int>>();
     constexpr int argc = 7;
@@ -814,7 +814,7 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenInvalidNumericalArgument_WillCrash
 TEST(CommandParserTest, ParsedCommandImpl_WhenOptionSuppliedWithDashes_WillForgiveAndParse)
 {
     std::string expectedCommand { "dummyCommand" };
-    std::string firstOption { "--firstFlag" };
+    std::string firstOption { "--first-Flag" };
     std::string secondOption { "-secondFlag" };
     std::string thirdOption { "--thirdUnknownFlag" };
     auto command
