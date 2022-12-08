@@ -743,9 +743,9 @@ private:
 namespace UnparsedCommand {
 /**
  * @brief Helper function to create an unparsed command
- * @param id The command ID (e.g. "add")
+ * @param id The command ID (e.g. "add"), i.e. the first argument passed to the binary
  * @param description The command description (e.g. "Add a new item")
- * @param usage The command usage (e.g. "add <item>")
+ * @param usage The command usage (e.g. "add <item>") including arguments and options
  * @return An unparsed command
  */
 [[nodiscard]] inline details::UnparsedCommandImpl<void>
