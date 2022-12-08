@@ -706,6 +706,23 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenOptionalInteger_WillParse)
     EXPECT_FALSE(secondArgument);
 }
 
+TEST(CommandParserTest, ParsedCommandImpl_WhenOptionalBooleanNotProvided_WillParse)
+{
+    // Let's make a separate test for std::optional<bool> since it can be misleading as it is `false` both when not
+    // provided but also when provided as false
+    std::string expectedCommand { "dummyCommand" };
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s).withArgs<std::optional<bool>>();
+    constexpr int argc = 2;
+    std::array<std::string, argc> arguments { "binary"s, expectedCommand };
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    auto [firstArgument] = parsedCommand.getArgs(command);
+    EXPECT_FALSE(firstArgument.has_value()); // Explicitly calling has_value() to ensure it is not provided
+}
+
 TEST(CommandParserTest, ParsedCommandImpl_WhenNotEnoughNumericalArguments_WillNotParse)
 {
     std::string expectedCommand { "dummyCommand" };
@@ -1057,5 +1074,5 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenCustomTypeArgumentVector_WillParse
     auto [firstParsedArgument, secondParsedArgument] = parsedCommand.getArgs(command);
     EXPECT_EQ(firstParsedArgument, firstArgument);
     std::vector expectedArguments { secondArgument, thirdArgument };
-    EXPECT_THAT(secondParsedArgument, expectedArguments);
+    EXPECT_EQ(secondParsedArgument, expectedArguments);
 }
