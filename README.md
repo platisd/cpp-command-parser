@@ -23,7 +23,8 @@ See [example_main.cpp](example_main.cpp) for a simple example of how to use the 
 ```cpp
 const auto all = UnparsedCommand::create("all", "Print current configuration");
 const auto get = UnparsedCommand::create("get", "Get configuration key", "[-xyz] <key> [default]")
-                         .withOptions({ "x", "y", "z" })
+                         .withOptions({ "x", "y", "z" }) // Can be --x or -x etc
+                         .withAliases({ "g", "get-key" }); // Alternative IDs for the command instead of "get"
                          .withArgs<std::string, std::optional<std::string>>();
 const auto encrypt = UnparsedCommand::create(
                          "encrypt"
