@@ -270,7 +270,7 @@ public:
         std::string usage,
         std::unordered_set<std::string> options)
         : id_ { std::move(id) }
-        , aliases_ { aliases }
+        , aliases_ { std::move(aliases) }
         , description_ { std::move(description) }
         , usage_ { std::move(usage) }
         , options_ { std::move(options) }
@@ -356,12 +356,20 @@ public:
     /**
      * @brief Construct a new command with the specified argument types
      * @tparam T The argument types
-     * @return A new command with the specified argument types
+     * @return A new command with the specified argument types added to any existing ones
      */
     template <typename... T>
-    UnparsedCommandImpl<T...> withArgs() const
+    auto withArgs() const
     {
-        return UnparsedCommandImpl<T...> { id_, aliases_, description_, usage_, options_ };
+        // We need to filter out void, mostly from the existing arguments, or it will cause issues when instantiating it
+        using TupleOfExistingArgsWithoutVoid = decltype(std::tuple_cat(
+            std::conditional_t<std::is_same_v<void, Args>, std::tuple<>, std::tuple<Args>> {}...));
+        using TupleOfNewArgsWithoutVoid
+            = decltype(std::tuple_cat(std::conditional_t<std::is_same_v<void, T>, std::tuple<>, std::tuple<T>> {}...));
+        using InstanceWithConcatinatedArgs
+            = decltype(createFromTuples(TupleOfExistingArgsWithoutVoid {}, TupleOfNewArgsWithoutVoid {}));
+
+        return InstanceWithConcatinatedArgs { id_, aliases_, description_, usage_, options_ };
     }
 
     /**
@@ -403,6 +411,12 @@ private:
     static constexpr bool hasNoArguments()
     {
         return std::is_same_v<std::tuple<T...>, std::tuple<void>>;
+    }
+
+    template <typename... ExistingTypes, typename... NewTypes>
+    static auto createFromTuples(std::tuple<ExistingTypes...>, std::tuple<NewTypes...>)
+    {
+        return UnparsedCommandImpl<ExistingTypes..., NewTypes...> {};
     }
 };
 
