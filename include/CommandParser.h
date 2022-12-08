@@ -134,9 +134,10 @@ constexpr bool isPartitioned(InputIt first, InputIt last, UnaryPredicate p)
     return true;
 }
 
-// constexpr std::count it's not available in C++17 from https://en.cppreference.com/w/cpp/algorithm/count
+// constexpr std::count since it's not available in C++17
+// Adapted from: https://en.cppreference.com/w/cpp/algorithm/count
 template <class InputIt, class T>
-constexpr typename std::iterator_traits<InputIt>::difference_type count(InputIt first, InputIt last, const T& value)
+constexpr auto count(InputIt first, InputIt last, const T& value)
 {
     typename std::iterator_traits<InputIt>::difference_type n = 0;
     for (; first != last; ++first) {
