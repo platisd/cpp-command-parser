@@ -78,6 +78,9 @@ enforced during compilation:
     * Zero or more optional arguments: May be of any number or not provided, but cannot precede a mandatory argument and
       cannot be combined with a `std::optional` argument
 
+In addition to the above, any user-defined type that is default constructible and constructible from a `std::string` is
+also allowed.
+
 ## Why not `insert your favorite CLI parsing library here`?
 
 In all fairness, this library was created under the misconception that [cxxopts](https://github.com/jarro2783/cxxopts)
