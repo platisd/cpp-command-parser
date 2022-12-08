@@ -89,7 +89,7 @@ also allowed.
 ## Why not `insert your favorite CLI parsing library here`?
 
 In all fairness, this library was created under the misconception that [cxxopts](https://github.com/jarro2783/cxxopts)
-was not able to satisfy our use-case out of the box, which is **not** true. Some of its advantages are:
+was not able to satisfy our use-case out of the box, which is **not** true. Some of its cool features are:
 
 * Compile-time check of argument count and types (i.e. you cannot "forget" to parse an argument or parse one that was
   not expected)
