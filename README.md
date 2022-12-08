@@ -4,10 +4,11 @@
 
 Command Parser is a C++17 header-only utility library for parsing command line "commands".
 
-We define a _command_ as a string passed to a binary as a command line argument in the form of:
+We define a _command_ as the _first_ CLI argument passed to a binary in the form of:
 
 ```bash
 ./your_binary command_name <arg1> <arg2> [arg3]
+# `command_name` is the command
 ```
 
 A command may optionally take some (boolean) options
@@ -15,6 +16,9 @@ A command may optionally take some (boolean) options
 ```bash
 ./your_binary command_name --option1 --option2 <arg1> <arg2> [arg3]
 ```
+
+As long as your CLI application requires the _first_ argument to be a "command", this library will help you parse the
+command, as well as any subcommands and options.
 
 ## Usage
 
