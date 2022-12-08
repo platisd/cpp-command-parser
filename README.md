@@ -57,7 +57,8 @@ if (parsedCommand.is(all)) {
         std::cout << "file " << file << std::endl;
     }
 } else {
-        parsedCommand.help();
+        std::cout << "Available commands:" << std::endl;
+        std::cout << parsedCommand.help() << std::endl;
 }
 ```
 

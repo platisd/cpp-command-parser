@@ -844,7 +844,8 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenInvalidNumericalArgument_WillCrash
     auto argv = toArgv(arguments);
     std::tuple commands { command };
 
-    EXPECT_ANY_THROW(UnparsedCommand::parse(argc, argv.data(), commands));
+    auto shouldThrow = [&] { static_cast<void>(UnparsedCommand::parse(argc, argv.data(), commands)); };
+    EXPECT_ANY_THROW(shouldThrow());
 }
 
 TEST(CommandParserTest, ParsedCommandImpl_WhenOptionSuppliedWithDashes_WillForgiveAndParse)

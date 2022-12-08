@@ -577,7 +577,7 @@ public:
      * @return Whether the parsed command matches the unparsed command
      */
     template <typename CommandType>
-    bool is(const CommandType& command) const
+    [[nodiscard]] bool is(const CommandType& command) const
     {
         return command.id() == commandId_;
     }
@@ -589,7 +589,7 @@ public:
      * @return  A command-specific tuple with the parsed arguments
      */
     template <typename CommandType>
-    typename CommandType::ArgumentsType getArgs(const CommandType& command) const
+    [[nodiscard]] auto getArgs(const CommandType& command) const
     {
         assert((is(command)) && "Command not found"); // NOLINT (cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         static_cast<void>(command); // Avoid unused parameter warning in non-debug builds
@@ -609,7 +609,7 @@ public:
      * @param option
      * @return true if the option was encountered, false otherwise
      */
-    bool hasOption(const std::string& option) const
+    [[nodiscard]] bool hasOption(const std::string& option) const
     {
         // Let's be forgiving if someone looks for "--option" instead of "option"
         std::string_view view { option };
@@ -621,13 +621,13 @@ public:
      * @brief Get any unknown options encountered during parsing
      * @return A set of unknown options
      */
-    std::unordered_set<std::string> getUnknownOptions() const { return unknownOptions_; }
+    [[nodiscard]] std::unordered_set<std::string> getUnknownOptions() const { return unknownOptions_; }
 
     /**
      * @brief Get the help prompt
      * @return The help prompt
      */
-    std::string help() const { return helpPrompt_; }
+    [[nodiscard]] std::string help() const { return helpPrompt_; }
 
 private:
     std::optional<std::size_t> commandIndex_ {};
@@ -748,7 +748,7 @@ namespace UnparsedCommand {
  * @param usage The command usage (e.g. "add <item>")
  * @return An unparsed command
  */
-inline details::UnparsedCommandImpl<void>
+[[nodiscard]] inline details::UnparsedCommandImpl<void>
 create(const std::string& id, const std::string& description, const std::string& usage = "")
 {
     return details::UnparsedCommandImpl<void> { id, {}, description, usage, {} };
@@ -763,7 +763,7 @@ create(const std::string& id, const std::string& description, const std::string&
  * @return A parsed command
  */
 template <typename T>
-ParsedCommandImpl<T> parse(int argc, char* argv[], const T& unparsedCommands)
+[[nodiscard]] ParsedCommandImpl<T> parse(int argc, char* argv[], const T& unparsedCommands)
 {
     return ParsedCommandImpl<T> { argc, argv, unparsedCommands };
 }
