@@ -49,8 +49,19 @@ template <typename T>
 struct isVector<std::vector<T>> : std::true_type {
 };
 
+template <typename T, typename Valid = void>
+struct isAllowedCustomType : std::false_type {
+};
+
 template <typename T>
-struct isAllowedType : std::false_type {
+struct isAllowedCustomType<
+    T,
+    std::enable_if_t<std::is_default_constructible<T>::value && std::is_constructible<T, std::string>::value>>
+    : std::true_type {
+};
+
+template <typename T>
+struct isAllowedType : isAllowedCustomType<T> {
 };
 
 template <>
@@ -239,8 +250,11 @@ public:
         "All optional arguments must be placed in the end of the argument list");
     static_assert(
         hasAllowedTypes<Args...>(),
-        "All arguments be one of the following: bool, int, long, long long, unsigned long, unsigned long long, "
-        "float, double, long double, std::string and their std::optional and std::vector variants");
+        "All arguments must be one of the following: "
+        "bool, int, long, long long, unsigned long, unsigned long long, float, double, long double, std::string "
+        "or any type that is "
+        "default constructible and constructible from a std::string"
+        "along with their std::optional and std::vector variants");
     static_assert(
         hasNoPrecedingVector<Args...>(),
         "All vector arguments must be placed in the end of the argument list");

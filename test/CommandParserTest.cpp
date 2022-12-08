@@ -964,3 +964,98 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentsAndOptionsSuppliedInAnyOr
     EXPECT_TRUE(parsedCommand.hasOption(firstOption));
     EXPECT_TRUE(parsedCommand.hasOption(secondOption));
 }
+
+struct AllowedCustomType {
+    AllowedCustomType() = default;
+    AllowedCustomType(std::string i)
+        : id { prefix + i }
+        , originalId { i }
+    {
+    }
+    std::string prefix { "(¬‿¬)" };
+    std::string id {};
+    std::string originalId {};
+
+    bool operator==(const AllowedCustomType& other) const { return id == other.id; }
+};
+static_assert(details::isAllowedCustomType<AllowedCustomType>::value);
+
+struct TypeWithoutDefaultConstructor {
+    TypeWithoutDefaultConstructor(std::string) {}
+};
+static_assert(!details::isAllowedCustomType<TypeWithoutDefaultConstructor>::value);
+
+struct TypeWithoutStringConstructor {
+    TypeWithoutStringConstructor() = default;
+};
+static_assert(!details::isAllowedCustomType<TypeWithoutStringConstructor>::value);
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenCustomTypeArgumentSupplied_WillParse)
+{
+    std::string expectedCommand { "dummyCommand" };
+    std::string firstArgument { "firstArgument" };
+    AllowedCustomType secondArgument { "secondArgument" };
+
+    auto command
+        = UnparsedCommand::create(expectedCommand, "dummyDescription"s).withArgs<std::string, AllowedCustomType>();
+    constexpr int argc = 4;
+    std::array<std::string, argc> arguments { "binary"s, expectedCommand, firstArgument, secondArgument.originalId };
+
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    auto [firstParsedArgument, secondParsedArgument] = parsedCommand.getArgs(command);
+    EXPECT_EQ(firstParsedArgument, firstArgument);
+    EXPECT_EQ(secondParsedArgument, secondArgument);
+}
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenCustomTypeArgumentOptional_WillParse)
+{
+    std::string expectedCommand { "dummyCommand" };
+    std::string firstArgument { "firstArgument" };
+    AllowedCustomType secondArgument { "secondArgument" };
+
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s)
+                       .withArgs<std::string, std::optional<AllowedCustomType>, std::optional<AllowedCustomType>>();
+    constexpr int argc = 4;
+    std::array<std::string, argc> arguments { "binary"s, expectedCommand, firstArgument, secondArgument.originalId };
+
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    auto [firstParsedArgument, secondParsedArgument, thirdParsedArgument] = parsedCommand.getArgs(command);
+    EXPECT_EQ(firstParsedArgument, firstArgument);
+    EXPECT_EQ(secondParsedArgument, secondArgument);
+    EXPECT_FALSE(thirdParsedArgument);
+}
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenCustomTypeArgumentVector_WillParse)
+{
+    std::string expectedCommand { "dummyCommand" };
+    std::string firstArgument { "firstArgument" };
+    AllowedCustomType secondArgument { "secondArgument" };
+    AllowedCustomType thirdArgument { "thirdArgument" };
+
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s)
+                       .withArgs<std::string, std::vector<AllowedCustomType>>();
+    constexpr int argc = 5;
+    std::array<std::string, argc> arguments { "binary"s,
+                                              expectedCommand,
+                                              firstArgument,
+                                              secondArgument.originalId,
+                                              thirdArgument.originalId };
+
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    auto [firstParsedArgument, secondParsedArgument] = parsedCommand.getArgs(command);
+    EXPECT_EQ(firstParsedArgument, firstArgument);
+    std::vector expectedArguments { secondArgument, thirdArgument };
+    EXPECT_THAT(secondParsedArgument, expectedArguments);
+}
