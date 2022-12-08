@@ -20,6 +20,9 @@ A command may optionally take some (boolean) options
 As long as your CLI application requires the _first_ argument to be a "command", this library will help you parse the
 command, as well as any subcommands and options.
 
+To put it simply, **there must be at least one argument**. That first argument to the binary is your "command".
+If your logic does _not_ require at least one argument to be passed as a "command", then this library is not for you.
+
 ## Usage
 
 See [example_main.cpp](example_main.cpp) for a simple example of how to use the library. In a nutshell:
