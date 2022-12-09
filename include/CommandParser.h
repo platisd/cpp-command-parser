@@ -713,8 +713,12 @@ private:
 
     void parseArgument(bool& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)
     {
-        for (const auto& trueValue : { "true", "True", "TRUE", "1", "on" }) {
-            if (unparsedArgs[index] == trueValue) {
+        for (const auto& trueValue : { "true", "yes", "1", "on" }) {
+            const auto argumentIsTrueIgnoringCase
+                = std::equal(unparsedArgs[index].begin(), unparsedArgs[index].end(), trueValue, [](auto a, auto b) {
+                      return std::tolower(a) == std::tolower(b);
+                  });
+            if (argumentIsTrueIgnoringCase) {
                 argToSet = true;
                 return;
             }

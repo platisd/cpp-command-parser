@@ -72,6 +72,12 @@ enforced during compilation:
 
 * `std::string`
 * `bool`
+    * The following (case-insensitive) strings are considered `true` and everything else `false`:
+        * `true`
+        * `yes`
+        * `y`
+        * `on`
+        * `1`
 * `int`
 * `long`
 * `long long`

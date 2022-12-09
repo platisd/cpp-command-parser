@@ -610,8 +610,8 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentIsBoolean_WillParse)
 {
     std::string expectedCommand { "dummyCommand" };
     auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s)
-                       .withArgs<bool, bool, bool, bool, bool, bool, bool, bool, bool, bool>();
-    constexpr int argc = 12;
+                       .withArgs<bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool>();
+    constexpr int argc = 14;
     std::array<std::string, argc> arguments {
         "binary"s, expectedCommand, //
         "true", // 1st
@@ -623,14 +623,17 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentIsBoolean_WillParse)
         "on", // 7th
         "off", // 8th
         "0", // 9th
-        "TrUe" // 10th
+        "TrUe", // 10th
+        "yEs", // 11th
+        "y" // 12th
     };
     auto argv = toArgv(arguments);
     std::tuple commands { command };
 
     auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
     ASSERT_TRUE(parsedCommand.is(command));
-    auto [first, second, third, fourth, fifth, sixth, seventh, eighth, ninth, tenth] = parsedCommand.getArgs(command);
+    auto [first, second, third, fourth, fifth, sixth, seventh, eighth, ninth, tenth, eleventh, twelfth]
+        = parsedCommand.getArgs(command);
     EXPECT_TRUE(first);
     EXPECT_FALSE(second);
     EXPECT_TRUE(third);
@@ -640,7 +643,9 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentIsBoolean_WillParse)
     EXPECT_TRUE(seventh);
     EXPECT_FALSE(eighth);
     EXPECT_FALSE(ninth);
-    EXPECT_FALSE(tenth); // Typo in "TrUe"
+    EXPECT_TRUE(tenth);
+    EXPECT_TRUE(eleventh);
+    EXPECT_TRUE(twelfth);
 }
 
 TEST(CommandParserTest, ParsedCommandImpl_WhenVectorOfIntegers_WillParse)
