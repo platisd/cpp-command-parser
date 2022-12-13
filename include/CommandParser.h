@@ -311,8 +311,9 @@ public:
         constexpr ArrayWrapper r { isVector<Args>::value... };
         if (anyOf(r.begin(), r.end(), [](auto v) { return v; })) {
             return std::numeric_limits<std::size_t>::max();
+        } else {
+            return sizeof...(Args);
         }
-        return sizeof...(Args);
     }
 
     /**
@@ -412,6 +413,15 @@ public:
     {
         aliases.insert(aliases_.begin(), aliases_.end());
         return UnparsedCommandImpl<Args...> { id_, std::move(aliases), description_, usage_, options_ };
+    }
+
+    void foo()
+    {
+        std::vector<int> vector_of_ints {};
+        vector_of_ints.reserve(1);
+        vector_of_ints.push_back(1);
+        vector_of_ints.push_back(2);
+        static_cast<void>(vector_of_ints);
     }
 
 private:
