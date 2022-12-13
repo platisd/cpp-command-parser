@@ -36,7 +36,7 @@ jobs:
             -export-fixes clang-tidy-fixes.yaml \
             include/CommandParser.h example_main.cpp
       - name: Run clang-tidy-pr-comments action
-        uses: platisd/clang-tidy-pr-comments@master
+        uses: platisd/clang-tidy-pr-comments@fix_non_consecutive_bug
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           clang_tidy_fixes: clang-tidy-fixes.yaml
