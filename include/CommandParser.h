@@ -176,21 +176,21 @@ class ArrayWrapper
 {
 public:
     explicit constexpr ArrayWrapper(Ts... ts)
-        : data { ts... }
+        : data_ { ts... }
     {
     }
 
     using value_type = std::tuple_element_t<0, std::tuple<Ts...>>;
 
-    [[nodiscard]] constexpr const value_type* begin() const { return static_cast<const value_type*>(data); }
+    [[nodiscard]] constexpr const value_type* begin() const { return static_cast<const value_type*>(data_); }
 
     [[nodiscard]] constexpr const value_type* end() const
     {
-        return static_cast<const value_type*>(data) + sizeof...(Ts);
+        return static_cast<const value_type*>(data_) + sizeof...(Ts);
     }
 
 private:
-    value_type data[sizeof...(Ts)];
+    value_type data_[sizeof...(Ts)];
 };
 
 /// @brief Check that arguments which are mandatory are always expected before optional ones
