@@ -12,6 +12,8 @@ jobs:
             cxx: g++-10
           - cc: clang-8
             cxx: clang++-8
+          - cc: clang-10
+            cxx: clang++-10
           - cc: clang-12
             cxx: clang++-12
     env:
