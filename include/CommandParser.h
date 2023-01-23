@@ -242,6 +242,13 @@ constexpr void removeAllLeadingDashes(std::string_view& view)
     view.remove_prefix(std::min(view.find_first_not_of('-'), view.size()));
 }
 
+template <typename T, typename Tuple>
+struct typeInTuple;
+
+template <typename T, typename... Types>
+struct typeInTuple<T, std::tuple<Types...>> : std::disjunction<std::is_same<T, Types>...> {
+};
+
 template <typename... Args>
 class UnparsedCommandImpl
 {
@@ -580,6 +587,10 @@ public:
     template <typename CommandType>
     [[nodiscard]] bool is(const CommandType& command) const
     {
+        static_assert(
+            details::typeInTuple<CommandType, T>::value,
+            "The specified command was not included in the tuple of commands passed when calling "
+            "UnparsedCommand::parse");
         return command.id() == commandId_;
     }
 
