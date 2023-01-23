@@ -465,9 +465,9 @@ class ParsedCommandImpl
 public:
     /**
      * @brief Constructs a parsed command
-     * @param unparsedCommand A tuple with the unparsed commands
      * @param argc The argument count
      * @param argv The argument values
+     * @param commands A tuple with the unparsed commands
      * @warning Users should probably use the helper function `UnparsedCommand::parse`
      */
     ParsedCommandImpl(int argc, char* argv[], const T& commands)
