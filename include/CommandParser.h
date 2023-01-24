@@ -471,7 +471,7 @@ public:
      * @warning Users should probably use the helper function `UnparsedCommand::parse`
      */
     ParsedCommandImpl(int argc, char* argv[], const T& commands)
-        : helpPrompt_(createHelpPrompt(commands))
+        : helpPrompt_ { createHelpPrompt(commands) }
     {
         if (argc < 2) {
             std::cerr << "No command passed" << std::endl;
