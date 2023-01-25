@@ -1082,3 +1082,34 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenCustomTypeArgumentVector_WillParse
     std::vector expectedArguments { secondArgument, thirdArgument };
     EXPECT_EQ(secondParsedArgument, expectedArguments);
 }
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentStartingWithMoreThanTwoDashes_WillNotBeTreatedAsOption)
+{
+    std::string expectedCommand { "dummyCommand" };
+    std::string firstArgument { "firstArgument" };
+    std::string startWithTripleDashArg { "---secondArgument" }; // non-alphanumeric after double dash
+    std::string tooShortToBeAnOptionArg { "-" };
+    std::string containsSpacesArg { "--third argument" };
+    std::string justTwoDashesArg { "--" };
+
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s)
+                       .withArgs<std::string, std::string, std::string, std::string, std::string>();
+    constexpr int argc = 7;
+    std::array<std::string, argc> arguments {
+        "binary"s,         expectedCommand, firstArgument, startWithTripleDashArg, tooShortToBeAnOptionArg,
+        containsSpacesArg, justTwoDashesArg
+    };
+
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    auto [firstParsedArgument, secondParsedArgument, thirdParsedArgument, fourthParsedArgument, fifthParsedArgument]
+        = parsedCommand.getArgs(command);
+    EXPECT_EQ(firstParsedArgument, firstArgument);
+    EXPECT_EQ(secondParsedArgument, startWithTripleDashArg);
+    EXPECT_EQ(thirdParsedArgument, tooShortToBeAnOptionArg);
+    EXPECT_EQ(fourthParsedArgument, containsSpacesArg);
+    EXPECT_EQ(fifthParsedArgument, justTwoDashesArg);
+}
