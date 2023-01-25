@@ -242,6 +242,38 @@ constexpr void removeAllLeadingDashes(std::string_view& view)
     view.remove_prefix(std::min(view.find_first_not_of('-'), view.size()));
 }
 
+constexpr bool isAnOption(std::string_view argument)
+{
+    // Too small to be an option
+    if (argument.size() < 2) {
+        return false;
+    }
+    // It's a negative number
+    if (argument[0] == '-' && std::isdigit(argument[1], std::locale::classic())) {
+        return false;
+    }
+    // Does not start with one or two dashes
+    const auto startsWithSingleDash = argument[0] == '-';
+    const auto startsWithDoubleDash = argument[0] == '-' && argument[1] == '-';
+    if (!startsWithSingleDash && !startsWithDoubleDash) {
+        return false;
+    }
+    // Contains spaces (we will eventually have to rethink this when doing #7)
+    if (argument.find(' ') != std::string_view::npos) {
+        return false;
+    }
+    // If we start with two dashes, then there should be at least one more character
+    if (startsWithDoubleDash && argument.size() < 3) {
+        return false;
+    }
+    // If we start with two dashes, then the following character should be alphanumeric
+    if (startsWithDoubleDash && !std::isalnum(argument[2], std::locale::classic())) {
+        return false;
+    }
+
+    return true;
+}
+
 template <typename T, typename Tuple>
 struct typeInTuple;
 
@@ -481,12 +513,12 @@ public:
         std::vector<std::string> unparsedArgs {};
         std::vector<std::string> unparsedOptions {};
         for (int i = 2; i < argc; ++i) {
-            if (argv[i][0] == '-' && !std::isdigit(argv[i][1], std::locale::classic())) {
-                std::string_view option { argv[i] };
-                details::removeAllLeadingDashes(option);
-                unparsedOptions.emplace_back(option.data());
+            std::string_view argument { argv[i] };
+            if (details::isAnOption(argument)) {
+                details::removeAllLeadingDashes(argument);
+                unparsedOptions.emplace_back(argument.data());
             } else {
-                unparsedArgs.emplace_back(argv[i]);
+                unparsedArgs.emplace_back(argument.data());
             }
         }
 
