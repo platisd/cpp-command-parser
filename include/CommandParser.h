@@ -432,6 +432,34 @@ private:
     std::unordered_set<std::string> shortOptions_ {};
 };
 
+template <typename SubcommandTypes>
+class UnparsedCommandGroupImpl
+{
+public:
+    UnparsedCommandGroupImpl(std::string id, std::string description)
+        : id_ { std::move(id) }
+        , description_ { std::move(description) }
+        , subcommands_ {}
+    {
+    }
+
+    UnparsedCommandGroupImpl(std::string id, std::string description, std::tuple<SubcommandTypes> subcommands)
+        : id_ { std::move(id) }
+        , description_ { std::move(description) }
+        , subcommands_ { std::move(subcommands) }
+    {
+    }
+
+    std::string id() const { return id_; };
+    std::string description() const { return description_; };
+    std::tuple<SubcommandTypes> subcommands() const { return subcommands_; }
+
+private:
+    std::string id_ {};
+    std::string description_ {};
+    std::tuple<SubcommandTypes> subcommands_ {};
+};
+
 /**
  * @brief Given a tuple of UnparsedCommandImpl
  * create a tuple of UnparsedCommandImpl::ArgumentsType
@@ -771,3 +799,10 @@ template <typename T>
     return ParsedCommandImpl<T> { argc, argv, unparsedCommands };
 }
 } // namespace UnparsedCommand
+
+namespace UnparsedCommandGroup {
+[[nodiscard]] inline auto create(const std::string& id, const std::string& description)
+{
+    return details::UnparsedCommandGroupImpl<std::tuple<>> { id, description };
+}
+}
