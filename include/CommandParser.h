@@ -675,7 +675,7 @@ public:
 
 private:
     std::optional<std::size_t> commandIndex_ {};
-    using ParsedArgumentsType = decltype(transformUnparsedArgumentsType(T {}));
+    using ParsedArgumentsType = decltype(details::transformUnparsedArgumentsType(T {}));
     ParsedArgumentsType parsedArguments_ {};
     std::string commandId_ {};
     std::string helpPrompt_ {};
