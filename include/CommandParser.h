@@ -1,7 +1,6 @@
 #pragma once
 
 #include <algorithm>
-#include <any>
 #include <cassert>
 #include <iomanip>
 #include <iostream>
@@ -64,12 +63,12 @@ template <typename T>
 struct isAllowedType : isAllowedCustomType<T> {
 };
 
-template <>
-struct isAllowedType<std::string> : std::true_type {
+template <typename... Ts>
+struct isAllowedType<std::tuple<Ts...>> : std::conjunction<isAllowedType<Ts>...> {
 };
 
 template <>
-struct isAllowedType<void> : std::true_type {
+struct isAllowedType<std::string> : std::true_type {
 };
 
 template <>
@@ -148,29 +147,6 @@ constexpr auto count(InputIt first, InputIt last, const T& value)
     return n;
 }
 
-// constexpr std::all_of because it's not available in C++17
-template <class InputIt, class UnaryPredicate>
-constexpr bool allOf(InputIt first, InputIt last, UnaryPredicate p)
-{
-    for (; first != last; ++first) {
-        if (!p(*first)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-template <class InputIt, class UnaryPredicate>
-constexpr bool anyOf(InputIt first, InputIt last, UnaryPredicate p)
-{
-    for (; first != last; ++first) {
-        if (p(*first)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 template <class... Ts>
 class ArrayWrapper
 {
@@ -209,13 +185,6 @@ constexpr bool hasNoPrecedingVector()
 {
     constexpr ArrayWrapper r { !isVector<Types>::value... };
     return isPartitioned(r.begin(), r.end(), [](auto v) { return v; });
-}
-
-template <class... Types>
-constexpr bool hasAllowedTypes()
-{
-    constexpr ArrayWrapper r { isAllowedType<Types>::value... };
-    return allOf(r.begin(), r.end(), [](auto v) { return v; });
 }
 
 template <class... Types>
@@ -281,26 +250,27 @@ template <typename T, typename... Types>
 struct typeInTuple<T, std::tuple<Types...>> : std::disjunction<std::is_same<T, Types>...> {
 };
 
-template <typename... Args>
+template <typename CommandTypes>
 class UnparsedCommandImpl
 {
 public:
     static_assert(
-        hasNoPrecedingOptionalArguments<Args...>(),
+        // CommandTypes is a tuple, get all elements from it and pass them to hasNoPrecedingOptionalArguments
+        hasNoPrecedingOptionalArguments<CommandTypes>(),
         "All optional arguments must be placed in the end of the argument list");
     static_assert(
-        hasAllowedTypes<Args...>(),
+        isAllowedType<CommandTypes>(),
         "All arguments must be one of the following: "
         "bool, int, long, long long, unsigned long, unsigned long long, float, double, long double, std::string "
         "or any type that is "
         "default constructible and constructible from a std::string"
         "along with their std::optional and std::vector variants");
     static_assert(
-        hasNoPrecedingVector<Args...>(),
+        hasNoPrecedingVector<CommandTypes>(),
         "All vector arguments must be placed in the end of the argument list");
-    static_assert(containsAtMostOneVector<Args...>(), "At most one vector argument is allowed");
+    static_assert(containsAtMostOneVector<CommandTypes>(), "At most one vector argument is allowed");
     static_assert(
-        doesNotContainBothOptionalAndVector<Args...>(),
+        doesNotContainBothOptionalAndVector<CommandTypes>(),
         "Cannot expect both std::optional and std::vector arguments");
 
     /**
@@ -344,14 +314,15 @@ public:
      */
     constexpr std::size_t getMaxArgCount() const
     {
-        if (hasNoArguments<Args...>()) {
-            return 0;
-        }
-        constexpr ArrayWrapper r { isVector<Args>::value... };
-        if (anyOf(r.begin(), r.end(), [](auto v) { return v; })) {
+        bool hasVectorArgument { false };
+        visitTuple(CommandTypes {}, [&hasVectorArgument](auto&& arg) {
+            using Type = std::decay_t<decltype(arg)>;
+            hasVectorArgument |= isVector<Type>::value;
+        });
+        if (hasVectorArgument) {
             return std::numeric_limits<std::size_t>::max();
         }
-        return sizeof...(Args);
+        return std::tuple_size_v<CommandTypes>;
     }
 
     /**
@@ -361,12 +332,18 @@ public:
      */
     constexpr std::size_t getRequiredArgCount() const
     {
-        constexpr ArrayWrapper r { !isOptional<Args>::value && !isVector<Args>::value
-                                   && !std::is_same_v<void, Args>... };
-        return count(r.begin(), r.end(), true);
+        std::size_t requiredArguments {};
+        visitTuple(CommandTypes {}, [&requiredArguments](auto&& arg) {
+            using Type = std::decay_t<decltype(arg)>;
+            if (!isVector<Type>::value && !isOptional<Type>::value) {
+                ++requiredArguments;
+            }
+        });
+
+        return requiredArguments;
     }
 
-    using ArgumentsType = std::tuple<Args...>;
+    using ArgumentsType = CommandTypes;
 
     /**
      * @brief Get the command ID
@@ -415,22 +392,15 @@ public:
     template <typename... T>
     auto withArgs() const
     {
-        // We need to filter out void, mostly from the existing arguments, or it will cause issues when instantiating it
-        using TupleOfExistingArgsWithoutVoid = decltype(std::tuple_cat(
-            std::conditional_t<std::is_same_v<void, Args>, std::tuple<>, std::tuple<Args>> {}...));
-        using TupleOfNewArgsWithoutVoid
-            = decltype(std::tuple_cat(std::conditional_t<std::is_same_v<void, T>, std::tuple<>, std::tuple<T>> {}...));
-        using InstanceWithConcatinatedArgs
-            = decltype(createFromTuples(TupleOfExistingArgsWithoutVoid {}, TupleOfNewArgsWithoutVoid {}));
-
-        return InstanceWithConcatinatedArgs { id_, aliases_, description_, usage_, options_ };
+        using ConcatinatedTypes = decltype(std::tuple_cat(std::declval<CommandTypes>(), std::tuple<T...> {}));
+        return UnparsedCommandImpl<ConcatinatedTypes> { id_, aliases_, description_, usage_, options_ };
     }
 
     /**
      * @brief Construct a new command with the specified options
      * @return A new command with the additional options
      */
-    UnparsedCommandImpl<Args...> withOptions(std::unordered_set<std::string> options) const
+    UnparsedCommandImpl<CommandTypes> withOptions(std::unordered_set<std::string> options) const
     {
         // Be forgiving to the user misunderstanding the API usage and strip any leading dashes
         std::unordered_set<std::string> sanitizedOptions(options.size());
@@ -440,17 +410,17 @@ public:
             sanitizedOptions.emplace(view);
         }
         sanitizedOptions.insert(options_.begin(), options_.end());
-        return UnparsedCommandImpl<Args...> { id_, aliases_, description_, usage_, std::move(sanitizedOptions) };
+        return UnparsedCommandImpl<CommandTypes> { id_, aliases_, description_, usage_, std::move(sanitizedOptions) };
     }
 
     /**
      * @brief Construct a new command with the specified ID aliases
      * @return A new command with the additional IDs
      */
-    UnparsedCommandImpl<Args...> withAliases(std::unordered_set<std::string> aliases) const
+    UnparsedCommandImpl<CommandTypes> withAliases(std::unordered_set<std::string> aliases) const
     {
         aliases.insert(aliases_.begin(), aliases_.end());
-        return UnparsedCommandImpl<Args...> { id_, std::move(aliases), description_, usage_, options_ };
+        return UnparsedCommandImpl<CommandTypes> { id_, std::move(aliases), description_, usage_, options_ };
     }
 
 private:
@@ -460,34 +430,18 @@ private:
     std::string usage_ {};
     std::unordered_set<std::string> options_ {};
     std::unordered_set<std::string> shortOptions_ {};
-
-    template <typename... T>
-    static constexpr bool hasNoArguments()
-    {
-        return std::is_same_v<std::tuple<T...>, std::tuple<void>>;
-    }
-
-    template <typename... ExistingTypes, typename... NewTypes>
-    static auto createFromTuples(std::tuple<ExistingTypes...>, std::tuple<NewTypes...>)
-    {
-        return UnparsedCommandImpl<ExistingTypes..., NewTypes...> {};
-    }
 };
 
 /**
- * @brief Given a tuple of UnparsedCommandImpl create a tuple of
- * UnparsedCommandImpl::ParsedArgumentsType but use std::any instead of void to
- * make its usage easier
+ * @brief Given a tuple of UnparsedCommandImpl
+ * create a tuple of UnparsedCommandImpl::ArgumentsType
  * @tparam T
  * @return A tuple of tuples with the argument types
  */
 template <typename... T>
 constexpr auto transformUnparsedArgumentsType(std::tuple<T...>)
 {
-    return std::tuple<std::conditional_t<
-        std::is_same_v<typename T::ArgumentsType, std::tuple<void>>,
-        std::tuple<std::any>,
-        typename T::ArgumentsType>...> {};
+    return std::tuple<typename T::ArgumentsType...> {};
 }
 } // namespace details
 
@@ -640,7 +594,9 @@ public:
         typename CommandType::ArgumentsType argsToReturn {};
         details::visitTuple(parsedArguments_, [&argsToReturn, this, index = 0U](auto&& arg) mutable {
             if (index == commandIndex_.value()) {
-                argsToReturn = std::any_cast<typename CommandType::ArgumentsType>(arg);
+                if constexpr (std::is_same_v<std::decay_t<decltype(arg)>, std::decay_t<decltype(argsToReturn)>>) {
+                    argsToReturn = arg;
+                }
             }
             ++index;
         });
@@ -796,10 +752,9 @@ namespace UnparsedCommand {
  * @param usage The command usage (e.g. "add <item>") including arguments and options
  * @return An unparsed command
  */
-[[nodiscard]] inline details::UnparsedCommandImpl<void>
-create(const std::string& id, const std::string& description, const std::string& usage = "")
+[[nodiscard]] inline auto create(const std::string& id, const std::string& description, const std::string& usage = "")
 {
-    return details::UnparsedCommandImpl<void> { id, {}, description, usage, {} };
+    return details::UnparsedCommandImpl<std::tuple<>> { id, {}, description, usage, {} };
 }
 
 /**
