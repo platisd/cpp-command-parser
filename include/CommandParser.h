@@ -436,6 +436,9 @@ template <typename SubcommandTypes>
 class UnparsedCommandGroupImpl
 {
 public:
+    using ArgumentsType = SubcommandTypes;
+
+    UnparsedCommandGroupImpl() = default;
     UnparsedCommandGroupImpl(std::string id, std::string description)
         : id_ { std::move(id) }
         , description_ { std::move(description) }
@@ -443,21 +446,47 @@ public:
     {
     }
 
-    UnparsedCommandGroupImpl(std::string id, std::string description, std::tuple<SubcommandTypes> subcommands)
+    UnparsedCommandGroupImpl(std::string id, std::string description, SubcommandTypes subcommands)
         : id_ { std::move(id) }
         , description_ { std::move(description) }
         , subcommands_ { std::move(subcommands) }
     {
     }
 
+    template <typename NewSubcommandType>
+    auto withSubcommands(NewSubcommandType newSubcommands) const
+    {
+        const auto concatinatedSubcommands = std::tuple_cat(subcommands_, newSubcommands);
+        using NewType = decltype(concatinatedSubcommands);
+        return UnparsedCommandGroupImpl<NewType> { id_, description_, concatinatedSubcommands };
+    }
+
+    constexpr std::size_t getRequiredArgCount() const
+    {
+        std::size_t count {};
+        visitTuple(subcommands_, [&count](const auto& subcommand) { count += subcommand.getRequiredArgCount(); });
+        return 0;
+    }
+
     std::string id() const { return id_; };
     std::string description() const { return description_; };
-    std::tuple<SubcommandTypes> subcommands() const { return subcommands_; }
+    SubcommandTypes subcommands() const { return subcommands_; }
+    bool matches(const std::string& id) const { return id == id_; }
+
+    std::unordered_set<std::string> options() const { return {}; };
+    std::unordered_set<std::string> shortOptions() const { return {}; };
+    std::string usage() const { return ""; }; // TODO: Figure out usage for groups
 
 private:
     std::string id_ {};
     std::string description_ {};
-    std::tuple<SubcommandTypes> subcommands_ {};
+    SubcommandTypes subcommands_ {};
+
+    template <typename... ExistingTypes, typename... NewTypes>
+    static auto createFromTuples(std::tuple<ExistingTypes...>, std::tuple<NewTypes...>)
+    {
+        return UnparsedCommandGroupImpl<ExistingTypes..., NewTypes...> {};
+    }
 };
 
 /**
@@ -509,11 +538,11 @@ public:
         bool commandHasCorrectArguments {};
         details::visitTuple(
             commands,
-            [&commandId, &commandFound, &unparsedArgs, &commandHasCorrectArguments, &unparsedOptions, this, index = 0U](
+            [&commandId, &commandFound, &unparsedArgs, &commandHasCorrectArguments, unparsedOptions, this, index = 0U](
                 auto&& command) mutable {
                 if (command.matches(commandId)) {
                     commandFound = true;
-                    const auto expectedMaxNumberOfArguments = command.getMaxArgCount();
+                    const auto expectedMaxNumberOfArguments = 100; // TODO: Fix command.getMaxArgCount();
                     const auto expectedMinNumberOfArguments = command.getRequiredArgCount();
                     if (unparsedArgs.size() < expectedMinNumberOfArguments
                         || unparsedArgs.size() > expectedMaxNumberOfArguments) {
@@ -552,6 +581,7 @@ public:
                                         parsedOptions_.emplace(std::string { c });
                                     }
                                 } else {
+                                    // TODO: Will need to rethink
                                     unknownOptions_.emplace(unparsedOption);
                                 }
                             }
@@ -762,6 +792,16 @@ private:
             ++index;
         }
     }
+
+    template <typename E>
+    void parseArgument(
+        details::UnparsedCommandImpl<E>& argToSet,
+        const std::vector<std::string>& unparsedArgs,
+        unsigned int& index)
+    {
+        argToSet = unparsedArgs[index];
+    }
+
     template <typename E>
     void
     parseArgument(std::optional<E>& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)

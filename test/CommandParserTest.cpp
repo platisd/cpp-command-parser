@@ -1113,3 +1113,26 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentStartingWithMoreThanTwoDas
     EXPECT_EQ(fourthParsedArgument, containsSpacesArg);
     EXPECT_EQ(fifthParsedArgument, justTwoDashesArg);
 }
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenSubcommandsSupplied_WillParse)
+{
+    std::string groupCommand { "group" };
+    std::string subcommand1 { "subcommand1" };
+    std::string subcommand2 { "subcommand2" };
+    std::tuple groupedCommands { UnparsedCommand::create(subcommand1, "dummyDescription"s).withArgs<std::string>(),
+                                 UnparsedCommand::create(subcommand2, "dummyDescription"s) };
+
+    auto group = UnparsedCommandGroup::create(groupCommand, "dummyDescription"s).withSubcommands(groupedCommands);
+
+    std::string standAloneCommand { "standAloneCommand" };
+    auto standAlone = UnparsedCommand::create(standAloneCommand, "").withArgs<std::string>();
+    std::tuple commands { group, standAlone };
+
+    constexpr int argc = 3;
+    std::array<std::string, argc> arguments { "binary"s, groupCommand, subcommand2 };
+
+    auto argv = toArgv(arguments);
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+
+    std::cout << "Test" << std::endl;
+}
