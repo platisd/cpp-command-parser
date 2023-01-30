@@ -250,6 +250,15 @@ template <typename T, typename... Types>
 struct typeInTuple<T, std::tuple<Types...>> : std::disjunction<std::is_same<T, Types>...> {
 };
 
+// TransformTuple is a tuple of the same size as the original tuple, but with types returned by the predicate
+template <typename Tuple, typename Predicate>
+constexpr auto transformTuple(Tuple&& tuple, Predicate&& predicate)
+{
+    return std::apply(
+        [&predicate](auto&&... args) { return std::make_tuple(predicate(std::forward<decltype(args)>(args))...); },
+        std::forward<Tuple>(tuple));
+}
+
 template <typename CommandTypes>
 class UnparsedCommandImpl
 {
@@ -432,11 +441,25 @@ private:
     std::unordered_set<std::string> shortOptions_ {};
 };
 
+template <typename T>
+struct isUnparsedCommandImpl : std::false_type {
+};
+template <typename... Ts>
+struct isUnparsedCommandImpl<UnparsedCommandImpl<Ts...>> : std::true_type {
+};
+
+template <typename T>
+struct isUnparsedCommandImplTuple : std::false_type {
+};
+template <typename... Ts>
+struct isUnparsedCommandImplTuple<std::tuple<Ts...>> : std::conjunction<isUnparsedCommandImpl<Ts>...> {
+};
+
 template <typename SubcommandTypes>
 class UnparsedCommandGroupImpl
 {
 public:
-    using ArgumentsType = SubcommandTypes;
+    using CommandsType = SubcommandTypes;
 
     UnparsedCommandGroupImpl() = default;
     UnparsedCommandGroupImpl(std::string id, std::string description)
@@ -457,7 +480,7 @@ public:
     auto withSubcommands(NewSubcommandType newSubcommands) const
     {
         const auto concatinatedSubcommands = std::tuple_cat(subcommands_, newSubcommands);
-        using NewType = decltype(concatinatedSubcommands);
+        using NewType = std::remove_const_t<decltype(concatinatedSubcommands)>;
         return UnparsedCommandGroupImpl<NewType> { id_, description_, concatinatedSubcommands };
     }
 
@@ -489,23 +512,20 @@ private:
     }
 };
 
-/**
- * @brief Given a tuple of UnparsedCommandImpl
- * create a tuple of UnparsedCommandImpl::ArgumentsType
- * @tparam T
- * @return A tuple of tuples with the argument types
- */
-template <typename... T>
-constexpr auto transformUnparsedArgumentsType(std::tuple<T...>)
-{
-    return std::tuple<typename T::ArgumentsType...> {};
-}
+template <typename T>
+struct isUnparsedCommandGroupImpl : std::false_type {
+};
+template <typename... Ts>
+struct isUnparsedCommandGroupImpl<UnparsedCommandGroupImpl<Ts...>> : std::true_type {
+};
+
 } // namespace details
 
 template <typename T>
 class ParsedCommandImpl
 {
 public:
+    ParsedCommandImpl() = default;
     /**
      * @brief Constructs a parsed command
      * @param argc The argument count
@@ -688,8 +708,28 @@ public:
     [[nodiscard]] std::string help() const { return helpPrompt_; }
 
 private:
+    // Given an argument "group" of type details::UnparsedCommandGroupImpl<E> where the type parameter E is
+    // a tuple of an unknown number of UnparsedCommandImpl and UnparsedCommandGroupImpl,
+    // we need to recursively visit each element of E and break the groups down into UnparsedCommandImpl
+    // For example: `details::UnparsedCommandGroupImpl<std::tuple<details::UnparsedCommandImpl<std::tuple<std::string>>,
+    // details::UnparsedCommandImpl<std::tuple<>>>>` should become
+    // `std::tuple<details::ParsedCommandImpl<std::tuple<std::string>>, details::ParsedCommandImpl<std::tuple<>>>` Write
+    // the C++ code that does this
+
+    /**
+     * @brief Given a tuple of UnparsedCommandImpl create a tuple of UnparsedCommandImpl::ArgumentsType
+     * @tparam T
+     * @return A tuple of tuples with the argument types
+     */
+    template <typename... E>
+    static constexpr auto transformUnparsedArgumentsType(std::tuple<E...>)
+    {
+        // If the current type is an UnparsedCommandGroupImpl then we need to recurse into its CommandsType
+        //
+    }
+
     std::optional<std::size_t> commandIndex_ {};
-    using ParsedArgumentsType = decltype(details::transformUnparsedArgumentsType(T {}));
+    using ParsedArgumentsType = decltype(transformUnparsedArgumentsType(T {}));
     ParsedArgumentsType parsedArguments_ {};
     std::string commandId_ {};
     std::string helpPrompt_ {};
@@ -721,8 +761,18 @@ private:
         return helpPrompt.str();
     }
 
+    template <typename E>
+    void parseArgument(details::UnparsedCommandImpl<E>&, const std::vector<std::string>&, const unsigned int&)
+    {
+    }
+
     template <typename ArgumentType>
     void parseArgument(ArgumentType& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)
+    {
+        argToSet = unparsedArgs[index];
+    }
+
+    void parseArgument(std::string& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)
     {
         argToSet = unparsedArgs[index];
     }
@@ -791,15 +841,6 @@ private:
             argToSet.emplace_back(element);
             ++index;
         }
-    }
-
-    template <typename E>
-    void parseArgument(
-        details::UnparsedCommandImpl<E>& argToSet,
-        const std::vector<std::string>& unparsedArgs,
-        unsigned int& index)
-    {
-        argToSet = unparsedArgs[index];
     }
 
     template <typename E>
