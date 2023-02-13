@@ -321,8 +321,9 @@ public:
         });
         if (hasVectorArgument) {
             return std::numeric_limits<std::size_t>::max();
+        } else {
+            return std::tuple_size_v<CommandTypes>;
         }
-        return std::tuple_size_v<CommandTypes>;
     }
 
     /**
@@ -536,7 +537,8 @@ public:
         if (!commandFound) {
             std::cerr << "Unrecognized command: " << commandId << std::endl;
             return;
-        } if (!commandHasCorrectArguments) {
+        }
+        if (!commandHasCorrectArguments) {
             return;
         }
 
