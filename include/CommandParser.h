@@ -536,9 +536,7 @@ public:
         if (!commandFound) {
             std::cerr << "Unrecognized command: " << commandId << std::endl;
             return;
-        }
-
-        if (!commandHasCorrectArguments) {
+        } else if (!commandHasCorrectArguments) {
             return;
         }
 
