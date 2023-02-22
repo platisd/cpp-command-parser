@@ -18,5 +18,6 @@ endif (CODE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 
 # CommandParser test
 add_executable(command_parser_test CommandParserTest.cpp)
+target_compile_options(command_parser_test PRIVATE -fno-exceptions)
 target_link_libraries(command_parser_test command_parser coverage_config)
 configure_test(command_parser_test)
