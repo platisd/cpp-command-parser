@@ -3,6 +3,8 @@
 
 #include "CommandParser.h"
 
+#include <array>
+
 namespace {
 template <std::size_t Size>
 std::vector<char*> toArgv(std::array<std::string, Size>& arguments)
