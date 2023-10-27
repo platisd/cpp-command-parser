@@ -206,9 +206,9 @@ constexpr bool containsAtMostOneVector()
     return count(vectors.begin(), vectors.end(), true) <= 1;
 }
 
-constexpr void removeAllLeadingDashes(std::string_view& view)
+constexpr void removeAllLeading(std::string_view& view, char charToRemove)
 {
-    view.remove_prefix(std::min(view.find_first_not_of('-'), view.size()));
+    view.remove_prefix(std::min(view.find_first_not_of(charToRemove), view.size()));
 }
 
 constexpr bool isAnOption(std::string_view argument)
@@ -406,7 +406,7 @@ public:
         std::unordered_set<std::string> sanitizedOptions(options.size());
         for (const auto& option : options) {
             auto view = std::string_view { option };
-            removeAllLeadingDashes(view);
+            removeAllLeading(view, '-');
             sanitizedOptions.emplace(view);
         }
         sanitizedOptions.insert(options_.begin(), options_.end());
@@ -469,9 +469,10 @@ public:
         for (int i = 2; i < argc; ++i) {
             std::string_view argument { argv[i] };
             if (details::isAnOption(argument)) {
-                details::removeAllLeadingDashes(argument);
+                details::removeAllLeading(argument, '-');
                 unparsedOptions.emplace_back(argument.data());
             } else {
+                details::removeAllLeading(argument, '\\');
                 unparsedArgs.emplace_back(argument.data());
             }
         }
@@ -613,7 +614,7 @@ public:
     {
         // Let's be forgiving if someone looks for "--option" instead of "option"
         std::string_view view { option };
-        details::removeAllLeadingDashes(view);
+        details::removeAllLeading(view, '-');
         return parsedOptions_.find(std::string { view }) != parsedOptions_.end();
     }
 

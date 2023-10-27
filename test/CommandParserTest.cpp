@@ -1115,3 +1115,23 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentStartingWithMoreThanTwoDas
     EXPECT_EQ(fourthParsedArgument, containsSpacesArg);
     EXPECT_EQ(fifthParsedArgument, justTwoDashesArg);
 }
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentStartsWithEscapedHyphen_WillRemoveEscapeCharFromArgument)
+{
+    std::string expectedCommand { "dummyCommand" };
+    std::string firstArgument { "\\-bar" };
+
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s).withArgs<std::string>();
+    constexpr int argc = 3;
+    std::array<std::string, argc> arguments { "binary"s, expectedCommand, firstArgument };
+
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+
+    ASSERT_TRUE(parsedCommand.is(command));
+    auto [firstParsedArgument] = parsedCommand.getArgs(command);
+    auto expectedParsedArgument = firstArgument.substr(1); // -bar
+    EXPECT_EQ(firstParsedArgument, expectedParsedArgument);
+}
