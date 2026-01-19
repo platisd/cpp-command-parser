@@ -1135,3 +1135,72 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentStartsWithEscapedHyphen_Wi
     auto expectedParsedArgument = firstArgument.substr(1); // -bar
     EXPECT_EQ(firstParsedArgument, expectedParsedArgument);
 }
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenSubcommandProvided_WillParseSubcommandAndItsArguments)
+{
+    std::string firstSubcommandName { "firstSubcommand" };
+    std::string secondSubcommandName { "secondSubcommand" };
+    std::string firstArgument { "firstArgument" };
+    std::string secondArgument { "secondArgument" };
+
+    auto firstSubcommand
+        = UnparsedCommand::create(firstSubcommandName, "first subcommand description"s).withArgs<std::string>();
+    auto secondSubcommand = UnparsedCommand::create(secondSubcommandName, "second subcommand description"s)
+                                .withArgs<std::string, std::string>();
+    auto mainCommand = UnparsedCommand::create("mainCommand", "main command description"s)
+                           .withSubcommands(firstSubcommand, secondSubcommand);
+    constexpr int argc = 5;
+    std::array<std::string, argc> arguments {
+        "binary"s, "mainCommand", secondSubcommandName, firstArgument, secondArgument
+    };
+
+    auto argv = toArgv(arguments);
+    std::tuple commands { mainCommand };
+
+    auto parsedCommand = UnparsedCommand::parse(argc, argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(mainCommand));
+    const auto& subcommand = parsedCommand.getSubcommand();
+    ASSERT_TRUE(subcommand.is(secondSubcommand));
+    auto [firstParsedArgument, secondParsedArgument] = subcommand.getArgs(secondSubcommand);
+    EXPECT_EQ(firstParsedArgument, firstArgument);
+    EXPECT_EQ(secondParsedArgument, secondArgument);
+}
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenSubcommandWithSubCommands_WillParseAllCorrectly)
+{
+    std::string topLevelCommandName { "topLevelCommand" };
+    std::string midLevelCommandName { "midLevelCommand" };
+    std::string firstSubcommandName { "firstSubcommand" };
+    std::string secondSubcommandName { "secondSubcommand" };
+    std::string firstArgument { "firstArgument" };
+    std::string secondArgument { "secondArgument" };
+
+    auto firstSubcommand
+        = UnparsedCommand::create(firstSubcommandName, "first subcommand description"s).withArgs<std::string>();
+    auto secondSubcommand = UnparsedCommand::create(secondSubcommandName, "second subcommand description"s)
+                                .withArgs<std::string, std::string>();
+    auto midLevelCommand = UnparsedCommand::create(midLevelCommandName, "mid level command description"s)
+                               .withSubcommands(firstSubcommand, secondSubcommand);
+    auto topLevelCommand = UnparsedCommand::create(topLevelCommandName, "top level command description"s)
+                               .withSubcommands(midLevelCommand);
+    auto arguments = makeArray(
+        "binary"s,
+        topLevelCommandName,
+        midLevelCommandName,
+        secondSubcommandName,
+        firstArgument,
+        secondArgument);
+
+    auto argv = toArgv(arguments);
+    std::tuple commands { topLevelCommand };
+
+    auto parsedCommand = UnparsedCommand::parse(arguments.size(), argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(topLevelCommand));
+    const auto& midLevelParsedCommand = parsedCommand.getSubcommand();
+    ASSERT_TRUE(midLevelParsedCommand.is(midLevelCommand));
+    const auto& subcommand = midLevelParsedCommand.getSubcommand();
+    ASSERT_TRUE(subcommand.is(secondSubcommand));
+    auto [firstParsedArgument, secondParsedArgument] = subcommand.getArgs(secondSubcommand);
+    EXPECT_EQ(firstParsedArgument, firstArgument);
+    EXPECT_EQ(secondParsedArgument, secondArgument);
+}
