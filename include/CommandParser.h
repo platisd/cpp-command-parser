@@ -5,11 +5,11 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <tuple>
-#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -29,7 +29,7 @@ constexpr void visitTuple(T&& t, V&& v)
     tupleVisitImpl(
         std::forward<T>(t),
         std::forward<V>(v),
-        std::make_index_sequence<std::tuple_size<typename std::decay<T>::type>::value>());
+        std::make_index_sequence<std::tuple_size_v<std::decay_t<T>>>());
 }
 
 template <typename T, typename Valid = void>
@@ -55,8 +55,7 @@ struct isAllowedCustomType : std::false_type {
 template <typename T>
 struct isAllowedCustomType<
     T,
-    std::enable_if_t<std::is_default_constructible<T>::value && std::is_constructible<T, std::string>::value>>
-    : std::true_type {
+    std::enable_if_t<std::is_default_constructible_v<T> && std::is_constructible_v<T, std::string>>> : std::true_type {
 };
 
 template <typename T>
@@ -250,7 +249,7 @@ template <typename T, typename... Types>
 struct typeInTuple<T, std::tuple<Types...>> : std::disjunction<std::is_same<T, Types>...> {
 };
 
-template <typename CommandTypes>
+template <typename CommandTypes, typename SubcommandsTypes = std::tuple<>>
 class UnparsedCommandImpl
 {
 public:
@@ -285,6 +284,8 @@ public:
      * @param aliases The command aliases (e.g. "h")
      * @param description
      * @param usage How to use the command (e.g. "help [command]")
+     * @param options The command options
+     * @param subcommands The subcommands for this command
      * @warning Users should probably use the helper function `UnparsedCommand::create`
      */
     UnparsedCommandImpl(
@@ -292,12 +293,14 @@ public:
         std::unordered_set<std::string> aliases,
         std::string description,
         std::string usage,
-        std::unordered_set<std::string> options)
+        std::unordered_set<std::string> options,
+        SubcommandsTypes subcommands = {})
         : id_ { std::move(id) }
         , aliases_ { std::move(aliases) }
         , description_ { std::move(description) }
         , usage_ { std::move(usage) }
         , options_ { std::move(options) }
+        , subcommands_ { std::move(subcommands) }
     {
         for (const auto& option : options_) {
             if (option.size() == 1) {
@@ -385,6 +388,21 @@ public:
     std::unordered_set<std::string> shortOptions() const { return shortOptions_; };
 
     /**
+     * @brief Get the subcommands for this command
+     * @return The subcommands tuple
+     * @warning This function is to be used mostly internally
+     */
+    const SubcommandsTypes& subcommands() const { return subcommands_; };
+
+    /**
+     * @brief Check if this command has subcommands
+     * @return true if this command has subcommands, false otherwise
+     */
+    static constexpr bool hasSubcommands() { return std::tuple_size_v<SubcommandsTypes> > 0; }
+
+    using SubcommandsType = SubcommandsTypes;
+
+    /**
      * @brief Construct a new command with the specified argument types
      * @tparam T The argument types
      * @return A new command with the specified argument types added to any existing ones
@@ -392,15 +410,21 @@ public:
     template <typename... T>
     auto withArgs() const
     {
+        static_assert(
+            std::tuple_size_v<SubcommandsTypes> == 0,
+            "Cannot add arguments to a command that has subcommands. "
+            "Use arguments on the subcommands instead or create a new (sub)command.");
         using ConcatinatedTypes = decltype(std::tuple_cat(std::declval<CommandTypes>(), std::tuple<T...> {}));
-        return UnparsedCommandImpl<ConcatinatedTypes> { id_, aliases_, description_, usage_, options_ };
+        return UnparsedCommandImpl<ConcatinatedTypes, SubcommandsTypes> { id_,    aliases_, description_,
+                                                                          usage_, options_, subcommands_ };
     }
 
     /**
      * @brief Construct a new command with the specified options
      * @return A new command with the additional options
      */
-    UnparsedCommandImpl<CommandTypes> withOptions(std::unordered_set<std::string> options) const
+    UnparsedCommandImpl<CommandTypes, SubcommandsTypes>
+    withOptions(const std::unordered_set<std::string>& options) const
     {
         // Be forgiving to the user misunderstanding the API usage and strip any leading dashes
         std::unordered_set<std::string> sanitizedOptions(options.size());
@@ -410,17 +434,39 @@ public:
             sanitizedOptions.emplace(view);
         }
         sanitizedOptions.insert(options_.begin(), options_.end());
-        return UnparsedCommandImpl<CommandTypes> { id_, aliases_, description_, usage_, std::move(sanitizedOptions) };
+        return UnparsedCommandImpl<CommandTypes, SubcommandsTypes> {
+            id_, aliases_, description_, usage_, std::move(sanitizedOptions), subcommands_
+        };
     }
 
     /**
      * @brief Construct a new command with the specified ID aliases
      * @return A new command with the additional IDs
      */
-    UnparsedCommandImpl<CommandTypes> withAliases(std::unordered_set<std::string> aliases) const
+    UnparsedCommandImpl<CommandTypes, SubcommandsTypes> withAliases(std::unordered_set<std::string> aliases) const
     {
         aliases.insert(aliases_.begin(), aliases_.end());
-        return UnparsedCommandImpl<CommandTypes> { id_, std::move(aliases), description_, usage_, options_ };
+        return UnparsedCommandImpl<CommandTypes, SubcommandsTypes> { id_,    std::move(aliases), description_,
+                                                                     usage_, options_,           subcommands_ };
+    }
+
+    /**
+     * @brief Construct a new command with the specified subcommands
+     * @tparam Subcommands The subcommand types
+     * @param subcommands The subcommands
+     * @return A new command with the specified subcommands
+     */
+    template <typename... Subcommands>
+    auto withSubcommands(Subcommands... subcommands) const
+    {
+        static_assert(
+            std::tuple_size_v<CommandTypes> == 0,
+            "Cannot add subcommands to a command that has arguments. "
+            "Use arguments on the subcommands instead or create a new (sub)command.");
+        using NewSubcommandsTypes = std::tuple<Subcommands...>;
+        return UnparsedCommandImpl<CommandTypes, NewSubcommandsTypes> { id_,          aliases_,
+                                                                        description_, usage_,
+                                                                        options_,     std::make_tuple(subcommands...) };
     }
 
 private:
@@ -430,6 +476,27 @@ private:
     std::string usage_ {};
     std::unordered_set<std::string> options_ {};
     std::unordered_set<std::string> shortOptions_ {};
+    SubcommandsTypes subcommands_ {};
+};
+
+// Type alias for subcommands type extraction
+template <typename T>
+struct SubcommandsOf {
+    using type = std::tuple<>;
+};
+
+template <typename A, typename S>
+struct SubcommandsOf<UnparsedCommandImpl<A, S>> {
+    using type = S;
+};
+
+// Helper to concatenate all subcommands from a tuple of commands
+template <typename CommandsTuple>
+struct AllSubcommandsOf;
+
+template <typename... Commands>
+struct AllSubcommandsOf<std::tuple<Commands...>> {
+    using type = decltype(std::tuple_cat(std::declval<typename SubcommandsOf<Commands>::type>()...));
 };
 
 /**
@@ -454,10 +521,14 @@ public:
      * @param argc The argument count
      * @param argv The argument values
      * @param commands A tuple with the unparsed commands
+     * @param indentLevel The indentation level for help prompt (used internally for subcommands)
      * @warning Users should probably use the helper function `UnparsedCommand::parse`
      */
-    ParsedCommandImpl(int argc, char* argv[], const T& commands)
-        : helpPrompt_ { createHelpPrompt(commands) }
+    ParsedCommandImpl(int argc, char* argv[], const T& commands, std::size_t indentLevel = 0)
+        : argc_ { argc }
+        , argv_ { argv }
+        , indentLevel_ { indentLevel }
+        , helpPrompt_ { createHelpPrompt(commands) }
     {
         if (argc < 2) {
             std::cerr << "No command passed" << std::endl;
@@ -486,35 +557,66 @@ public:
                 auto&& command) mutable {
                 if (command.matches(commandId)) {
                     commandFound = true;
-                    const auto expectedMaxNumberOfArguments = command.getMaxArgCount();
-                    const auto expectedMinNumberOfArguments = command.getRequiredArgCount();
-                    if (unparsedArgs.size() < expectedMinNumberOfArguments
-                        || unparsedArgs.size() > expectedMaxNumberOfArguments) {
-                        std::cerr << "Wrong number of arguments for command: " << commandId << std::endl;
-                        std::cerr << command.id() << " " << command.usage() << " " << command.description()
-                                  << std::endl;
-                        std::cerr << "Expected ";
-                        const auto atLeastOrAtMost
-                            = unparsedArgs.size() < expectedMinNumberOfArguments ? "at least " : "at most ";
-                        std::cerr << atLeastOrAtMost << expectedMaxNumberOfArguments << " arguments, got "
-                                  << unparsedArgs.size() << " instead: ";
-                        for (const auto& arg : unparsedArgs) {
-                            std::cerr << "\"" << arg << "\""
-                                      << " ";
-                        }
-                        std::cerr << std::endl;
-                    } else {
+                    // Check if command has subcommands - if so, don't check argument count for main command
+                    if constexpr (std::decay_t<decltype(command)>::hasSubcommands()) {
                         commandHasCorrectArguments = true;
                         commandIndex_ = index;
                         commandId_ = command.id();
-                        // Match options
+                    } else {
+                        const auto expectedMaxNumberOfArguments = command.getMaxArgCount();
+                        const auto expectedMinNumberOfArguments = command.getRequiredArgCount();
+                        if (unparsedArgs.size() < expectedMinNumberOfArguments
+                            || unparsedArgs.size() > expectedMaxNumberOfArguments) {
+                            std::cerr << "Wrong number of arguments for command: " << commandId << std::endl;
+                            std::cerr << command.id() << " " << command.usage() << " " << command.description()
+                                      << std::endl;
+                            std::cerr << "Expected ";
+                            const auto atLeastOrAtMost
+                                = unparsedArgs.size() < expectedMinNumberOfArguments ? "at least " : "at most ";
+                            std::cerr << atLeastOrAtMost << expectedMaxNumberOfArguments << " arguments, got "
+                                      << unparsedArgs.size() << " instead: ";
+                            for (const auto& arg : unparsedArgs) {
+                                std::cerr << "\"" << arg << "\""
+                                          << " ";
+                            }
+                            std::cerr << std::endl;
+                        } else {
+                            commandHasCorrectArguments = true;
+                            commandIndex_ = index;
+                            commandId_ = command.id();
+                            // Parse arguments for commands without subcommands
+                            details::visitTuple(
+                                parsedArguments_,
+                                [&unparsedArgs, this, argumentIndex = 0U](auto&& argumentsToParse) mutable {
+                                    if (argumentIndex == commandIndex_.value()) {
+                                        details::visitTuple(
+                                            argumentsToParse,
+                                            [&unparsedArgs, this, parsedArgumentIndex = 0U](auto&& arg) mutable {
+                                                if (parsedArgumentIndex >= unparsedArgs.size()) {
+                                                    // We end up here when we are out of unparsed arguments. This can
+                                                    // happen when: We expected an optional argument that was not passed
+                                                    // by the user in which case we want to leave the argument in the
+                                                    // error state that it is, i.e. nullopt
+                                                    return;
+                                                }
+                                                this->parseArgument(arg, unparsedArgs, parsedArgumentIndex);
+                                                ++parsedArgumentIndex;
+                                            });
+                                    }
+                                    ++argumentIndex;
+                                });
+                        }
+                    }
+                    // Match options (for both commands with and without subcommands)
+                    if (commandHasCorrectArguments) {
                         for (const auto& unparsedOption : unparsedOptions) {
                             // Match stand-alone options
                             const auto availableOptions = command.options();
                             const auto search = availableOptions.find(unparsedOption);
                             if (search != availableOptions.end()) {
                                 parsedOptions_.emplace(unparsedOption);
-                            } else { // Match compound options (e.g. -abc instead of -a -b -c)
+                            } else {
+                                // Match compound options (e.g. -abc instead of -a -b -c)
                                 const auto allCharactersAreShortOptions
                                     = std::all_of(unparsedOption.begin(), unparsedOption.end(), [&command](auto c) {
                                           return command.shortOptions().find(std::string { c })
@@ -542,27 +644,6 @@ public:
         if (!commandHasCorrectArguments) {
             return;
         }
-
-        // Parse the unparsed arguments
-        details::visitTuple(
-            parsedArguments_,
-            [&unparsedArgs, this, argumentIndex = 0U](auto&& argumentsToParse) mutable {
-                if (argumentIndex == commandIndex_.value()) {
-                    details::visitTuple(
-                        argumentsToParse,
-                        [&unparsedArgs, this, parsedArgumentIndex = 0U](auto&& arg) mutable {
-                            if (parsedArgumentIndex >= unparsedArgs.size()) {
-                                // We end up here when we are out of unparsed arguments. This can happen when:
-                                // We expected an optional argument that was not passed by the user in which case we
-                                // want to leave the argument in the error state that it is, i.e. nullopt
-                                return;
-                            }
-                            this->parseArgument(arg, unparsedArgs, parsedArgumentIndex);
-                            ++parsedArgumentIndex;
-                        });
-                }
-                ++argumentIndex;
-            });
     }
 
     /**
@@ -630,7 +711,30 @@ public:
      */
     [[nodiscard]] std::string help() const { return helpPrompt_; }
 
+    /**
+     * @brief Get the parsed subcommand for the given command
+     * @tparam CommandType The type of command that has subcommands
+     * @param command The command whose subcommand to parse
+     * @return A ParsedCommandImpl for the subcommands
+     * @note The command must have subcommands and must be the matched command
+     */
+    template <typename CommandType>
+    [[nodiscard]] auto getSubcommand(const CommandType& command) const
+    {
+        static_assert(CommandType::hasSubcommands(), "Command does not have subcommands");
+        static_assert(
+            details::typeInTuple<CommandType, T>::value,
+            "The specified command was not included in the tuple of commands passed when calling "
+            "UnparsedCommand::parse");
+        assert(is(command) && "Can only get subcommand for the matched command");
+        using SubcommandsType = typename CommandType::SubcommandsType;
+        return ParsedCommandImpl<SubcommandsType>(argc_ - 1, argv_ + 1, command.subcommands(), indentLevel_ + 1);
+    }
+
 private:
+    int argc_ {};
+    char** argv_ {};
+    std::size_t indentLevel_ {};
     std::optional<std::size_t> commandIndex_ {};
     using ParsedArgumentsType = decltype(details::transformUnparsedArgumentsType(T {}));
     ParsedArgumentsType parsedArguments_ {};
@@ -655,8 +759,9 @@ private:
         });
 
         std::stringstream helpPrompt {};
-        details::visitTuple(commands, [&helpPrompt, longestCommandIdAndUsage](auto&& command) {
-            helpPrompt << " " << command.id() << " " << command.usage()
+        const std::string indent(indentLevel_ * 4 + 1, ' ');
+        details::visitTuple(commands, [&helpPrompt, longestCommandIdAndUsage, &indent](auto&& command) {
+            helpPrompt << indent << command.id() << " " << command.usage()
                        << std::string(longestCommandIdAndUsage - (command.id().size() + command.usage().size()), ' ')
                        << command.description() << std::endl;
         });
@@ -735,6 +840,7 @@ private:
             ++index;
         }
     }
+
     template <typename E>
     void
     parseArgument(std::optional<E>& argToSet, const std::vector<std::string>& unparsedArgs, const unsigned int& index)

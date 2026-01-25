@@ -24,12 +24,16 @@ int main(int argc, char* argv[])
               .withArgs<std::string>();
     const auto verify
         = UnparsedCommand::create("verify", "Verify secret", "<key> <secret>").withArgs<std::string, std::string>();
-    const auto encrypt = UnparsedCommand::create(
-                             "encrypt"
-                             "Encrypt the given files with the specified policy",
-                             "<policy> [file...]")
-                             .withArgs<std::string, std::vector<std::string>>();
-    const std::tuple commands { help, schema, defaults, all, list, get, clear, put, subscribe, verify, encrypt };
+    const auto encrypt
+        = UnparsedCommand::create("encrypt", "Encrypt the given files with the specified policy", "<policy> [file...]")
+              .withArgs<std::string, std::vector<std::string>>();
+    const auto remoteAdd
+        = UnparsedCommand::create("add", "Add a remote", "<name> <url>").withArgs<std::string, std::string>();
+    const auto remoteRemove = UnparsedCommand::create("remove", "Remove a remote", "<name>").withArgs<std::string>();
+    const auto remote = UnparsedCommand::create("remote", "Manage remotes").withSubcommands(remoteAdd, remoteRemove);
+    const std::tuple commands {
+        help, schema, defaults, all, list, get, clear, put, subscribe, verify, encrypt, remote
+    };
     const auto parsedCommand = UnparsedCommand::parse(argc, argv, commands);
 
     if (parsedCommand.is(schema)) {
@@ -59,6 +63,18 @@ int main(int argc, char* argv[])
         std::cout << "encrypt " << policy << std::endl;
         for (const auto& file : files) {
             std::cout << "file " << file << std::endl;
+        }
+    } else if (parsedCommand.is(remote)) {
+        const auto subcommand = parsedCommand.getSubcommand(remote);
+        if (subcommand.is(remoteAdd)) {
+            const auto [name, url] = subcommand.getArgs(remoteAdd);
+            std::cout << "Adding remote " << name << " -> " << url << std::endl;
+        } else if (subcommand.is(remoteRemove)) {
+            const auto [name] = subcommand.getArgs(remoteRemove);
+            std::cout << "Removing remote " << name << std::endl;
+        } else {
+            std::cout << "Remote subcommands:" << std::endl;
+            std::cout << subcommand.help() << std::endl;
         }
     } else {
         auto helpPrompt = parsedCommand.help();

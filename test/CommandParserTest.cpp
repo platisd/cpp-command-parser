@@ -229,6 +229,53 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenHelpCalled_WillPrintUsageAndDescri
     EXPECT_THAT(helpPrompt, testing::HasSubstr(expectedDescription2));
 }
 
+TEST(CommandParserTest, ParsedCommandImpl_WhenHelpWithSubcommands_WillPrintUsageAndDescriptionOfAllSubcommands)
+{
+    std::string expectedSubcommandDescription { "( ͡°( ͡° ͜ʖ( ͡° ͜ʖ ͡°)ʖ ͡°) ͡°)" };
+    std::string expectedSubcommandUsage { "ಠ╭╮ಠ" };
+    std::string expectedSubcommandCommand { "subcommand"s };
+    auto subcommand
+        = UnparsedCommand::create(expectedSubcommandCommand, expectedSubcommandDescription, expectedSubcommandUsage);
+    std::string expectedCommandDescription { "༼ つ ◕_◕ ༽つ" };
+    std::string expectedCommandUsage { "(ಥ﹏ಥ)" };
+    std::string expectedCommand { "dummyCommand" };
+    auto command = UnparsedCommand::create(expectedCommand, expectedCommandDescription, expectedCommandUsage)
+                       .withSubcommands(subcommand);
+
+    auto arguments = makeArray("binary"s, expectedCommand, expectedSubcommandCommand);
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(arguments.size(), argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    const auto subcommandParsed = parsedCommand.getSubcommand(command);
+    auto helpPrompt = subcommandParsed.help();
+    // Ensure all our rather "unique" strings are in the help prompt
+    EXPECT_THAT(helpPrompt, testing::HasSubstr(expectedSubcommandDescription));
+    EXPECT_THAT(helpPrompt, testing::HasSubstr(expectedSubcommandUsage));
+}
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenHelpWithSubcommands_SubcommandsAreIndentedBy4Spaces)
+{
+    auto subcommand = UnparsedCommand::create("sub", "sub description"s);
+    auto command = UnparsedCommand::create("cmd", "cmd description"s).withSubcommands(subcommand);
+
+    auto arguments = makeArray("binary"s, "cmd", "sub");
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(arguments.size(), argv.data(), commands);
+
+    // Top-level help starts with 1 space (indentLevel=0: 0*4+1=1)
+    auto topLevelHelp = parsedCommand.help();
+    EXPECT_THAT(topLevelHelp, testing::StartsWith(" cmd"));
+
+    // Subcommand help starts with 5 spaces (indentLevel=1: 1*4+1=5)
+    const auto subcommandParsed = parsedCommand.getSubcommand(command);
+    auto subcommandHelp = subcommandParsed.help();
+    EXPECT_THAT(subcommandHelp, testing::StartsWith("     sub"));
+}
+
 TEST(CommandParserTest, ParsedCommandImpl_WhenCommandStartingWithHyphens_WillStillGetParsed)
 {
     std::string expectedCommand { "--help" };
@@ -1113,7 +1160,7 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenSubcommandProvided_WillParseSubcom
 
     auto parsedCommand = UnparsedCommand::parse(arguments.size(), argv.data(), commands);
     ASSERT_TRUE(parsedCommand.is(mainCommand));
-    const auto& subcommand = parsedCommand.getSubcommand();
+    const auto subcommand = parsedCommand.getSubcommand(mainCommand);
     ASSERT_TRUE(subcommand.is(secondSubcommand));
     auto [firstParsedArgument, secondParsedArgument] = subcommand.getArgs(secondSubcommand);
     EXPECT_EQ(firstParsedArgument, firstArgument);
@@ -1150,11 +1197,73 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenSubcommandWithSubCommands_WillPars
 
     auto parsedCommand = UnparsedCommand::parse(arguments.size(), argv.data(), commands);
     ASSERT_TRUE(parsedCommand.is(topLevelCommand));
-    const auto& midLevelParsedCommand = parsedCommand.getSubcommand();
+    const auto midLevelParsedCommand = parsedCommand.getSubcommand(topLevelCommand);
     ASSERT_TRUE(midLevelParsedCommand.is(midLevelCommand));
-    const auto& subcommand = midLevelParsedCommand.getSubcommand();
+    const auto subcommand = midLevelParsedCommand.getSubcommand(midLevelCommand);
     ASSERT_TRUE(subcommand.is(secondSubcommand));
     auto [firstParsedArgument, secondParsedArgument] = subcommand.getArgs(secondSubcommand);
     EXPECT_EQ(firstParsedArgument, firstArgument);
     EXPECT_EQ(secondParsedArgument, secondArgument);
+}
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenNestedSubcommandsWithArguments_WillParseAllCorrectly)
+{
+    // Structure: put -> srv (with args)
+    //                 -> dev -> import (with args)
+    //                        -> update (with args)
+    const auto putSrv = UnparsedCommand::create("srv", "").withArgs<std::string, std::string>();
+    const auto putDevImport = UnparsedCommand::create("import", "").withArgs<std::string, std::string, std::string>();
+    const auto putDevUpdate = UnparsedCommand::create("update", "").withArgs<std::string, std::string>();
+    const auto putDev = UnparsedCommand::create("dev", "").withSubcommands(putDevImport, putDevUpdate);
+    const auto put
+        = UnparsedCommand::create("put", "", "<srv|dev> <alias> <cert|pk> [<cert>]").withSubcommands(putSrv, putDev);
+
+    std::tuple commands { put };
+
+    // put srv alias1 cert1
+    {
+        auto arguments = makeArray("binary"s, "put", "srv", "alias1", "cert1");
+        auto argv = toArgv(arguments);
+
+        auto parsedCommand = UnparsedCommand::parse(arguments.size(), argv.data(), commands);
+        ASSERT_TRUE(parsedCommand.is(put));
+        const auto subcommand = parsedCommand.getSubcommand(put);
+        ASSERT_TRUE(subcommand.is(putSrv));
+        auto [alias, cert] = subcommand.getArgs(putSrv);
+        EXPECT_EQ(alias, "alias1");
+        EXPECT_EQ(cert, "cert1");
+    }
+
+    // put dev import alias2 pk2 cert2
+    {
+        auto arguments = makeArray("binary"s, "put", "dev", "import", "alias2", "pk2", "cert2");
+        auto argv = toArgv(arguments);
+
+        auto parsedCommand = UnparsedCommand::parse(arguments.size(), argv.data(), commands);
+        ASSERT_TRUE(parsedCommand.is(put));
+        const auto devSubcommand = parsedCommand.getSubcommand(put);
+        ASSERT_TRUE(devSubcommand.is(putDev));
+        const auto importSubcommand = devSubcommand.getSubcommand(putDev);
+        ASSERT_TRUE(importSubcommand.is(putDevImport));
+        auto [alias, pk, cert] = importSubcommand.getArgs(putDevImport);
+        EXPECT_EQ(alias, "alias2");
+        EXPECT_EQ(pk, "pk2");
+        EXPECT_EQ(cert, "cert2");
+    }
+
+    // put dev update alias3 cert3
+    {
+        auto arguments = makeArray("binary"s, "put", "dev", "update", "alias3", "cert3");
+        auto argv = toArgv(arguments);
+
+        auto parsedCommand = UnparsedCommand::parse(arguments.size(), argv.data(), commands);
+        ASSERT_TRUE(parsedCommand.is(put));
+        const auto devSubcommand = parsedCommand.getSubcommand(put);
+        ASSERT_TRUE(devSubcommand.is(putDev));
+        const auto updateSubcommand = devSubcommand.getSubcommand(putDev);
+        ASSERT_TRUE(updateSubcommand.is(putDevUpdate));
+        auto [alias, cert] = updateSubcommand.getArgs(putDevUpdate);
+        EXPECT_EQ(alias, "alias3");
+        EXPECT_EQ(cert, "cert3");
+    }
 }
