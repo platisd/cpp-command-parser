@@ -65,6 +65,36 @@ if (parsedCommand.is(all)) {
 }
 ```
 
+### Subcommands
+
+Commands can have subcommands for hierarchical CLI structures:
+
+```cpp
+const auto add = UnparsedCommand::create("add", "Add a remote", "<name> <url>")
+                     .withArgs<std::string, std::string>();
+const auto remove = UnparsedCommand::create("remove", "Remove a remote", "<name>")
+                        .withArgs<std::string>();
+const auto remote = UnparsedCommand::create("remote", "Manage remotes")
+                        .withSubcommands(add, remove);
+
+const std::tuple commands { remote };
+const auto parsedCommand = UnparsedCommand::parse(argc, argv, commands);
+
+if (parsedCommand.is(remote)) {
+    const auto& subcommand = parsedCommand.getSubcommand();
+    if (subcommand.is(add)) {
+        const auto [name, url] = subcommand.getArgs(add);
+        std::cout << "Adding remote " << name << " -> " << url << std::endl;
+    } else if (subcommand.is(remove)) {
+        const auto [name] = subcommand.getArgs(remove);
+        std::cout << "Removing remote " << name << std::endl;
+    } else {
+        std::cout << "Remote subcommands:" << std::endl;
+        std::cout << subcommand.help() << std::endl;
+    }
+}
+```
+
 ### Allowed types
 
 The following types are permitted as arguments. They are mandatory unless otherwise specified and their usage rules are
