@@ -352,7 +352,7 @@ public:
      * @brief Get the command ID
      * @return The command ID
      */
-    std::string id() const { return id_; };
+    [[nodiscard]] std::string_view id() const { return id_; };
 
     /**
      * @brief Check if the supplied command ID matches the ID or the aliases of this command
@@ -731,6 +731,12 @@ public:
         using SubcommandsType = typename CommandType::SubcommandsType;
         return ParsedCommandImpl<SubcommandsType>(argc_ - 1, argv_ + 1, command.subcommands(), indentLevel_ + 1);
     }
+
+    /**
+     * @brief Get the command ID
+     * @return The command ID
+     */
+    [[nodiscard]] std::string_view id() const { return commandId_; }
 
 private:
     int argc_ {};

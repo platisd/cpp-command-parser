@@ -1267,3 +1267,24 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenNestedSubcommandsWithArguments_Wil
         EXPECT_EQ(cert, "cert3");
     }
 }
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenUnparsedCommand_WillReturnCorrectId)
+{
+    std::string expectedCommand { "dummyCommand" };
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s);
+    EXPECT_EQ(command.id(), expectedCommand);
+}
+
+TEST(CommandParserTest, ParsedCommandImpl_WhenParsedCommand_WillReturnCorrectId)
+{
+    std::string expectedCommand { "dummyCommand" };
+    auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s);
+    auto arguments = makeArray("binary"s, expectedCommand);
+
+    auto argv = toArgv(arguments);
+    std::tuple commands { command };
+
+    auto parsedCommand = UnparsedCommand::parse(arguments.size(), argv.data(), commands);
+    ASSERT_TRUE(parsedCommand.is(command));
+    EXPECT_EQ(parsedCommand.id(), expectedCommand);
+}
