@@ -481,22 +481,22 @@ private:
 
 // Type alias for subcommands type extraction
 template <typename T>
-struct SubcommandsOf {
+struct subCommandsOf {
     using type = std::tuple<>;
 };
 
 template <typename A, typename S>
-struct SubcommandsOf<UnparsedCommandImpl<A, S>> {
+struct subCommandsOf<UnparsedCommandImpl<A, S>> {
     using type = S;
 };
 
 // Helper to concatenate all subcommands from a tuple of commands
 template <typename CommandsTuple>
-struct AllSubcommandsOf;
+struct AllsubCommandsOf;
 
 template <typename... Commands>
-struct AllSubcommandsOf<std::tuple<Commands...>> {
-    using type = decltype(std::tuple_cat(std::declval<typename SubcommandsOf<Commands>::type>()...));
+struct AllsubCommandsOf<std::tuple<Commands...>> {
+    using type = decltype(std::tuple_cat(std::declval<typename subCommandsOf<Commands>::type>()...));
 };
 
 /**
@@ -726,6 +726,7 @@ public:
             details::typeInTuple<CommandType, T>::value,
             "The specified command was not included in the tuple of commands passed when calling "
             "UnparsedCommand::parse");
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         assert(is(command) && "Can only get subcommand for the matched command");
         using SubcommandsType = typename CommandType::SubcommandsType;
         return ParsedCommandImpl<SubcommandsType>(argc_ - 1, argv_ + 1, command.subcommands(), indentLevel_ + 1);
